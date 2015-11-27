@@ -1,10 +1,11 @@
-# Node Version Manager
+# SWI-Prolog Version Manager
 # Implemented as a POSIX-compliant function
 # Should work on sh, dash, bash, ksh, zsh
 # To use source this file from your bash profile
 #
-# Implemented by Tim Caswell <tim@creationix.com>
-# with much bash help from Matthew Ranney
+# Implemented by Falco Nogatz <fnogatz@gmail.com>.
+# Based on the Node Version Manager (nvm), by Tim
+# Caswell <tim@creationix.com> and Matthew Ranney
 
 { # this ensures the entire script is downloaded #
 
@@ -52,18 +53,8 @@ swivm_download() {
   fi
 }
 
-swivm_has_system_node() {
-  [ "$(swivm deactivate >/dev/null 2>&1 && command -v node)" != '' ]
-}
-
-swivm_has_system_iojs() {
-  [ "$(swivm deactivate >/dev/null 2>&1 && command -v iojs)" != '' ]
-}
-
-swivm_print_npm_version() {
-  if swivm_has "npm"; then
-    echo " (npm v$(npm --version 2>/dev/null))"
-  fi
+swivm_has_system_swi() {
+  [ "$(swivm deactivate >/dev/null 2>&1 && command -v swipl)" != '' ]
 }
 
 # Make zsh glob matching behave same as bash
@@ -88,20 +79,23 @@ unset SWIVM_SCRIPT_SOURCE 2> /dev/null
 if [ -z "$SWIVM_MIRROR" ]; then
   export SWIVM_MIRROR="http://www.swi-prolog.org/download"
 fi
+if [ -z "$GITHUB_MIRROR" ]; then
+  export GITHUB_MIRROR="https://github.com/SWI-Prolog/swipl-devel/archive"
+fi
 
 swivm_tree_contains_path() {
   local tree
   tree="$1"
-  local node_path
-  node_path="$2"
+  local swi_path
+  swi_path="$2"
 
-  if [ "@$tree@" = "@@" ] || [ "@$node_path@" = "@@" ]; then
-    >&2 echo "both the tree and the node path are required"
+  if [ "@$tree@" = "@@" ] || [ "@$swi_path@" = "@@" ]; then
+    >&2 echo "both the tree and the SWI-Prolog path are required"
     return 2
   fi
 
   local pathdir
-  pathdir=$(dirname "$node_path")
+  pathdir=$(dirname "$swi_path")
   while [ "$pathdir" != "" ] && [ "$pathdir" != "." ] && [ "$pathdir" != "/" ] && [ "$pathdir" != "$tree" ]; do
     pathdir=$(dirname "$pathdir")
   done
@@ -164,7 +158,7 @@ swivm_version_dir() {
 }
 
 swivm_alias_path() {
-  echo "$(swivm_version_dir)/alias"
+  echo "$SWIVM_DIR/alias"
 }
 
 swivm_version_path() {
@@ -194,9 +188,7 @@ swivm_ensure_version_installed() {
     if [ $? -eq 0 ]; then
       echo "N/A: version \"$PROVIDED_VERSION -> $VERSION\" is not yet installed" >&2
     else
-      local PREFIXED_VERSION
-      PREFIXED_VERSION="$(swivm_ensure_version_prefix "$PROVIDED_VERSION")"
-      echo "N/A: version \"${PREFIXED_VERSION:-$PROVIDED_VERSION}\" is not yet installed" >&2
+      echo "N/A: version \"$PROVIDED_VERSION\" is not yet installed" >&2
     fi
     return 1
   fi
@@ -217,13 +209,6 @@ swivm_version() {
     return $?
   fi
 
-  local SWIVM_NODE_PREFIX
-  SWIVM_NODE_PREFIX="$(swivm_node_prefix)"
-  case "_$PATTERN" in
-    "_$SWIVM_NODE_PREFIX" | "_$SWIVM_NODE_PREFIX-")
-      PATTERN="stable"
-    ;;
-  esac
   VERSION="$(swivm_ls "$PATTERN" | command tail -n1)"
   if [ -z "$VERSION" ] || [ "_$VERSION" = "_N/A" ]; then
     echo "N/A"
@@ -251,18 +236,12 @@ swivm_remote_version() {
 swivm_remote_versions() {
   local PATTERN
   PATTERN="$1"
-  case "_$PATTERN" in
-    "_$(swivm_node_prefix)")
-      VERSIONS="$(swivm_ls_remote)"
-    ;;
-    *)
-      if swivm_validate_implicit_alias "$PATTERN" 2> /dev/null ; then
-        echo >&2 "Implicit aliases are not supported in swivm_remote_versions."
-        return 1
-      fi
-      VERSIONS="$(echo "$(swivm_ls_remote "$PATTERN")" | command grep -v "N/A" | command sed '/^$/d')"
-    ;;
-  esac
+
+  if swivm_validate_implicit_alias "$PATTERN" 2> /dev/null ; then
+    echo >&2 "Implicit aliases are not supported in swivm_remote_versions."
+    return 1
+  fi
+  VERSIONS="$(echo "$(swivm_ls_remote "$PATTERN")" | command grep -v "N/A" | command sed '/^$/d')"
 
   if [ -z "$VERSIONS" ]; then
     echo "N/A"
@@ -276,17 +255,9 @@ swivm_is_valid_version() {
   if swivm_validate_implicit_alias "$1" 2> /dev/null; then
     return 0
   fi
-  case "$1" in
-    "$(swivm_iojs_prefix)" | \
-    "$(swivm_node_prefix)")
-      return 0
-    ;;
-    *)
-      local VERSION
-      VERSION="$(swivm_strip_iojs_prefix "$1")"
-      swivm_version_greater "$VERSION"
-    ;;
-  esac
+
+  local VERSION
+  swivm_version_greater "$VERSION"
 }
 
 swivm_normalize_version() {
@@ -295,7 +266,7 @@ swivm_normalize_version() {
 
 swivm_format_version() {
   local VERSION
-  VERSION="$(swivm_ensure_version_prefix "$1")"
+  VERSION="$1"
   if [ "_$(swivm_num_version_groups "$VERSION")" != "_3" ]; then
     swivm_format_version "${VERSION%.}.0"
   else
@@ -324,9 +295,9 @@ swivm_strip_path() {
     -e "s#$SWIVM_DIR/[^/]*$2[^:]*:##g" \
     -e "s#:$SWIVM_DIR/[^/]*$2[^:]*##g" \
     -e "s#$SWIVM_DIR/[^/]*$2[^:]*##g" \
-    -e "s#$SWIVM_DIR/versions/[^/]*/[^/]*$2[^:]*:##g" \
-    -e "s#:$SWIVM_DIR/versions/[^/]*/[^/]*$2[^:]*##g" \
-    -e "s#$SWIVM_DIR/versions/[^/]*/[^/]*$2[^:]*##g"
+    -e "s#$SWIVM_DIR/versions/[^/]*$2[^:]*:##g" \
+    -e "s#:$SWIVM_DIR/versions/[^/]*$2[^:]*##g" \
+    -e "s#$SWIVM_DIR/versions/[^/]*$2[^:]*##g"
 }
 
 swivm_prepend_path() {
@@ -335,13 +306,6 @@ swivm_prepend_path() {
   else
     echo "$2:$1"
   fi
-}
-
-swivm_binary_available() {
-  # binaries started with node 0.8.6
-  local FIRST_VERSION_WITH_BINARY
-  FIRST_VERSION_WITH_BINARY="0.8.6"
-  swivm_version_greater_than_or_equal_to "$(swivm_strip_iojs_prefix "$1")" "$FIRST_VERSION_WITH_BINARY"
 }
 
 swivm_alias() {
@@ -367,11 +331,9 @@ swivm_ls_current() {
   SWIVM_LS_CURRENT_SWIPL_PATH="$(command which swipl 2> /dev/null)"
   if [ $? -ne 0 ]; then
     echo 'none'
-  elif swivm_tree_contains_path "$(swivm_version_dir iojs)" "$SWIVM_LS_CURRENT_SWIPL_PATH"; then
-    swivm_add_iojs_prefix "$(iojs --version 2>/dev/null)"
   elif swivm_tree_contains_path "$SWIVM_DIR" "$SWIVM_LS_CURRENT_SWIPL_PATH"; then
     local VERSION
-    VERSION="$(swipl --version 2>/dev/null)"
+    VERSION="$(swipl --version 2>/dev/null | sed -r "s/^.* ([0-9](\.[0-9])*) .*$/\1/g")"
     echo "$VERSION"
   else
     echo 'system'
@@ -410,18 +372,9 @@ swivm_resolve_alias() {
   done
 
   if [ -n "$ALIAS" ] && [ "_$ALIAS" != "_$PATTERN" ]; then
-    local SWIVM_IOJS_PREFIX
-    SWIVM_IOJS_PREFIX="$(swivm_iojs_prefix)"
-    local SWIVM_NODE_PREFIX
-    SWIVM_NODE_PREFIX="$(swivm_node_prefix)"
     case "_$ALIAS" in
-      "_∞" | \
-      "_$SWIVM_IOJS_PREFIX" | "_$SWIVM_IOJS_PREFIX-" | \
-      "_$SWIVM_NODE_PREFIX" )
+      "_∞" )
         echo "$ALIAS"
-      ;;
-      *)
-        swivm_ensure_version_prefix "$ALIAS"
       ;;
     esac
     return 0
@@ -430,9 +383,6 @@ swivm_resolve_alias() {
   if swivm_validate_implicit_alias "$PATTERN" 2> /dev/null ; then
     local IMPLICIT
     IMPLICIT="$(swivm_print_implicit_alias local "$PATTERN" 2> /dev/null)"
-    if [ -n "$IMPLICIT" ]; then
-      swivm_ensure_version_prefix "$IMPLICIT"
-    fi
   fi
 
   return 2
@@ -457,13 +407,30 @@ swivm_resolve_local_alias() {
   fi
 }
 
-swivm_is_iojs_version() {
-  case "$1" in iojs-*) return 0 ;; esac
-  return 1
+swivm_version_mode() {
+  local VERSION
+  VERSION="$1"
+  local NORMALIZED_VERSION
+  NORMALIZED_VERSION="$(swivm_normalize_version "$VERSION")"
+  local MOD
+  MOD=$(expr "$NORMALIZED_VERSION" \/ 1000000 \% 2)
+  local MODE
+  MODE='stable'
+  if [ "$MOD" -eq 1 ]; then
+    MODE='devel'
+  fi
+  echo "$MODE"
 }
 
-swivm_add_iojs_prefix() {
-  command echo "$(swivm_iojs_prefix)-$(swivm_ensure_version_prefix "$(swivm_strip_iojs_prefix "$1")")"
+swivm_is_stable_version() {
+  local VERSION
+  VERSION="$1"
+  local MODE
+  MODE="$(swivm_version_mode "$VERSION")"
+  if [ "_$MODE" = "_stable" ]; then
+    return 0
+  fi
+  return 1
 }
 
 swivm_ls() {
@@ -476,28 +443,9 @@ swivm_ls() {
     return
   fi
 
-  local SWIVM_IOJS_PREFIX
-  SWIVM_IOJS_PREFIX="$(swivm_iojs_prefix)"
-  local SWIVM_NODE_PREFIX
-  SWIVM_NODE_PREFIX="$(swivm_node_prefix)"
-  local SWIVM_VERSION_DIR_IOJS
-  SWIVM_VERSION_DIR_IOJS="$(swivm_version_dir "$SWIVM_IOJS_PREFIX")"
-  local SWIVM_VERSION_DIR_NEW
-  SWIVM_VERSION_DIR_NEW="$(swivm_version_dir new)"
-  local SWIVM_VERSION_DIR_OLD
-  SWIVM_VERSION_DIR_OLD="$(swivm_version_dir old)"
-
-  case "$PATTERN" in
-    "$SWIVM_IOJS_PREFIX" | "$SWIVM_NODE_PREFIX" )
-      PATTERN="$PATTERN-"
-    ;;
-    *)
-      if swivm_resolve_local_alias "$PATTERN"; then
-        return
-      fi
-      PATTERN="$(swivm_ensure_version_prefix "$PATTERN")"
-    ;;
-  esac
+  if swivm_resolve_local_alias "$PATTERN"; then
+    return
+  fi
   if [ "_$PATTERN" = "_N/A" ]; then
     return
   fi
@@ -510,12 +458,10 @@ swivm_ls() {
   if [ $SWIVM_PATTERN_STARTS_WITH_V = true ] && [ "_$(swivm_num_version_groups "$PATTERN")" = "_3" ]; then
     if [ -d "$(swivm_version_path "$PATTERN")" ]; then
       VERSIONS="$PATTERN"
-    elif [ -d "$(swivm_version_path "$(swivm_add_iojs_prefix "$PATTERN")")" ]; then
-      VERSIONS="$(swivm_add_iojs_prefix "$PATTERN")"
     fi
   else
     case "$PATTERN" in
-      "$SWIVM_IOJS_PREFIX-" | "$SWIVM_NODE_PREFIX-" | "system") ;;
+      "system") ;;
       *)
         local NUM_VERSION_GROUPS
         NUM_VERSION_GROUPS="$(swivm_num_version_groups "$PATTERN")"
@@ -532,64 +478,29 @@ swivm_ls() {
       setopt shwordsplit
     fi
 
-    local SWIVM_DIRS_TO_SEARCH1
-    SWIVM_DIRS_TO_SEARCH1=''
-    local SWIVM_DIRS_TO_SEARCH2
-    SWIVM_DIRS_TO_SEARCH2=''
-    local SWIVM_DIRS_TO_SEARCH3
-    SWIVM_DIRS_TO_SEARCH3=''
+    local SWIVM_DIRS_TO_SEARCH
+    SWIVM_DIRS_TO_SEARCH="$(swivm_version_dir)"
     local SWIVM_ADD_SYSTEM
     SWIVM_ADD_SYSTEM=false
-    if swivm_is_iojs_version "$PATTERN"; then
-      SWIVM_DIRS_TO_SEARCH1="$SWIVM_VERSION_DIR_IOJS"
-      PATTERN="$(swivm_strip_iojs_prefix "$PATTERN")"
-      if swivm_has_system_iojs; then
-        SWIVM_ADD_SYSTEM=true
-      fi
-    elif [ "_$PATTERN" = "_$SWIVM_NODE_PREFIX-" ]; then
-      SWIVM_DIRS_TO_SEARCH1="$SWIVM_VERSION_DIR_OLD"
-      SWIVM_DIRS_TO_SEARCH2="$SWIVM_VERSION_DIR_NEW"
-      PATTERN=''
-      if swivm_has_system_node; then
-        SWIVM_ADD_SYSTEM=true
-      fi
-    else
-      SWIVM_DIRS_TO_SEARCH1="$SWIVM_VERSION_DIR_OLD"
-      SWIVM_DIRS_TO_SEARCH2="$SWIVM_VERSION_DIR_NEW"
-      SWIVM_DIRS_TO_SEARCH3="$SWIVM_VERSION_DIR_IOJS"
-      if swivm_has_system_iojs || swivm_has_system_node; then
-        SWIVM_ADD_SYSTEM=true
-      fi
+
+    if swivm_has_system_swi || swivm_has_system_swi; then
+      SWIVM_ADD_SYSTEM=true
     fi
 
-    if ! [ -d "$SWIVM_DIRS_TO_SEARCH1" ]; then
-      SWIVM_DIRS_TO_SEARCH1=''
-    fi
-    if ! [ -d "$SWIVM_DIRS_TO_SEARCH2" ]; then
-      SWIVM_DIRS_TO_SEARCH2="$SWIVM_DIRS_TO_SEARCH1"
-    fi
-    if ! [ -d "$SWIVM_DIRS_TO_SEARCH3" ]; then
-      SWIVM_DIRS_TO_SEARCH3="$SWIVM_DIRS_TO_SEARCH2"
+    if ! [ -d "$SWIVM_DIRS_TO_SEARCH" ]; then
+      SWIVM_DIRS_TO_SEARCH=''
     fi
 
     if [ -z "$PATTERN" ]; then
-      PATTERN='v'
+      PATTERN=''
     fi
-    if [ -n "$SWIVM_DIRS_TO_SEARCH1$SWIVM_DIRS_TO_SEARCH2$SWIVM_DIRS_TO_SEARCH3" ]; then
-      VERSIONS="$(command find "$SWIVM_DIRS_TO_SEARCH1" "$SWIVM_DIRS_TO_SEARCH2" "$SWIVM_DIRS_TO_SEARCH3" -maxdepth 1 -type d -name "$PATTERN*" \
+    if [ -n "$SWIVM_DIRS_TO_SEARCH" ]; then
+      VERSIONS="$(command find "$SWIVM_DIRS_TO_SEARCH" -maxdepth 1 -type d -name "$PATTERN*" \
         | command sed "
-            s#$SWIVM_VERSION_DIR_IOJS/#$SWIVM_IOJS_PREFIX-#;
-            \#$SWIVM_VERSION_DIR_IOJS# d;
             s#^$SWIVM_DIR/##;
             \#^versions\$# d;
-            s#^versions/##;
-            s#^v#$SWIVM_NODE_PREFIX-v#;
-            s#^\($SWIVM_IOJS_PREFIX\)[-/]v#\1.v#;
-            s#^\($SWIVM_NODE_PREFIX\)[-/]v#\1.v#" \
+            s#^versions/##" \
         | command sort -t. -u -k 2.2,2n -k 3,3n -k 4,4n \
-        | command sed "
-            s/^\($SWIVM_IOJS_PREFIX\)\./\1-/;
-            s/^$SWIVM_NODE_PREFIX\.//" \
       )"
     fi
 
@@ -662,30 +573,6 @@ swivm_ls_remote_index() {
   echo "$VERSIONS"
 }
 
-swivm_checksum() {
-  local SWIVM_CHECKSUM
-  if swivm_has "sha1sum" && ! swivm_is_alias "sha1sum"; then
-    SWIVM_CHECKSUM="$(command sha1sum "$1" | command awk '{print $1}')"
-  elif swivm_has "sha1" && ! swivm_is_alias "sha1"; then
-    SWIVM_CHECKSUM="$(command sha1 -q "$1")"
-  elif swivm_has "shasum" && ! swivm_is_alias "shasum"; then
-    SWIVM_CHECKSUM="$(shasum "$1" | command awk '{print $1}')"
-  else
-    echo "Unaliased sha1sum, sha1, or shasum not found." >&2
-    return 2
-  fi
-
-  if [ "_$SWIVM_CHECKSUM" = "_$2" ]; then
-    return
-  elif [ -z "$2" ]; then
-    echo 'Checksums empty' #missing in raspberry pi binary
-    return
-  else
-    echo 'Checksums do not match.' >&2
-    return 1
-  fi
-}
-
 swivm_print_versions() {
   local VERSION
   local FORMAT
@@ -737,7 +624,7 @@ swivm_print_implicit_alias() {
 
   SWIVM_COMMAND="swivm_ls_remote"
   if [ "_$1" = "_local" ]; then
-    SWIVM_COMMAND="swivm_ls node"
+    SWIVM_COMMAND="swivm_ls"
   fi
 
   ZHS_HAS_SHWORDSPLIT_UNSET=1
@@ -756,7 +643,6 @@ swivm_print_implicit_alias() {
   local STABLE
   local UNSTABLE
   local MOD
-  local NORMALIZED_VERSION
 
   ZHS_HAS_SHWORDSPLIT_UNSET=1
   if swivm_has "setopt"; then
@@ -764,6 +650,8 @@ swivm_print_implicit_alias() {
     setopt shwordsplit
   fi
   for MINOR in $LAST_TWO; do
+    MOD="$(swivm_version_mode "$MINOR")"
+# TODO
     NORMALIZED_VERSION="$(swivm_normalize_version "$MINOR")"
     MOD=$(expr "$NORMALIZED_VERSION" \/ 1000000 \% 2)
     if [ "$MOD" -eq 0 ]; then
@@ -844,10 +732,6 @@ swivm_ensure_default_set() {
   return $EXIT_CODE
 }
 
-swivm_is_merged_node_version() {
-   swivm_version_greater_than_or_equal_to "$1" v4.0.0
-}
-
 swivm_install() {
   local VERSION
   VERSION="$1"
@@ -862,11 +746,11 @@ swivm_install() {
   VERSION_PATH="$(swivm_version_path "$VERSION")"
   local SWIVM_OS
   SWIVM_OS="$(swivm_get_os)"
+  local MODE
+  MODE="$(swivm_version_mode "$VERSION")"
 
   local tarball
   tarball=''
-  local sum
-  sum=''
   local make
   make='make'
   if [ "_$SWIVM_OS" = "_freebsd" ]; then
@@ -876,44 +760,33 @@ swivm_install() {
   local tmpdir
   tmpdir="$SWIVM_DIR/src"
   local tmptarball
-  tmptarball="$tmpdir/node-$VERSION.tar.gz"
+  tmptarball="$tmpdir/swipl-$VERSION.tar.gz"
 
-  if [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$VERSION/node-$VERSION.tar.gz" -o - 2>&1 | command grep '200 OK')" != '' ]; then
-    tarball="$SWIVM_MIRROR/$VERSION/node-$VERSION.tar.gz"
-    sum=$(swivm_download -L -s "$SWIVM_MIRROR/$VERSION/SHASUMS.txt" -o - | command grep "node-${VERSION}.tar.gz" | command awk '{print $1}')
-  elif [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/node-$VERSION.tar.gz" -o - | command grep '200 OK')" != '' ]; then
-    tarball="$SWIVM_MIRROR/node-$VERSION.tar.gz"
+  if [ "$(swivm_download -L -s -I "$GITHUB_MIRROR/V$VERSION.tar.gz" -o - 2>&1 | command grep '200 OK')" != '' ]; then
+    tarball="$GITHUB_MIRROR/V$VERSION.tar.gz"
+  elif [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz" -o - | command grep '200 OK')" != '' ]; then
+    tarball="$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz"
+  elif [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz" -o - | command grep '200 OK')" != '' ]; then
+    tarball="$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz"
   fi
 
-  if (
+  local SRC_PATH
+  if ! (
     [ -n "$tarball" ] && \
     command mkdir -p "$tmpdir" && \
     echo "Downloading $tarball..." && \
+    command mkdir -p "$VERSION_PATH" && \
     swivm_download -L --progress-bar "$tarball" -o "$tmptarball" && \
-    swivm_checksum "$tmptarball" "$sum" && \
-    command tar -xzf "$tmptarball" -C "$tmpdir" && \
-    cd "$tmpdir/node-$VERSION" && \
-    ./configure --prefix="$VERSION_PATH" $ADDITIONAL_PARAMETERS && \
-    $make $MAKE_CXX && \
-    command rm -f "$VERSION_PATH" 2>/dev/null && \
-    $make $MAKE_CXX install
+    command tar -xzf "$tmptarball" -C "$VERSION_PATH" && \
+    cd "$VERSION_PATH" && \
+    mv "swipl-devel-$VERSION"/* . && \
+    cp build.templ build && \
+    sed -i "s@PREFIX=\$HOME@PREFIX=$VERSION_PATH@g" build && \
+    sed -i "s@MAKE=make@MAKE=$make@g" build && \
+    ./prepare --yes --all && \
+    ./build
     )
   then
-    if ! swivm_has "npm" ; then
-      echo "Installing npm..."
-      if swivm_version_greater 0.2.0 "$VERSION"; then
-        echo "npm requires node v0.2.3 or higher" >&2
-      elif swivm_version_greater_than_or_equal_to "$VERSION" 0.2.0; then
-        if swivm_version_greater 0.2.3 "$VERSION"; then
-          echo "npm requires node v0.2.3 or higher" >&2
-        else
-          swivm_download -L https://npmjs.org/install.sh -o - | clean=yes npm_install=0.2.19 sh
-        fi
-      else
-        swivm_download -L https://npmjs.org/install.sh -o - | clean=yes sh
-      fi
-    fi
-  else
     echo "swivm: install $VERSION failed!" >&2
     return 1
   fi
@@ -922,14 +795,9 @@ swivm_install() {
 }
 
 swivm_match_version() {
-  local SWIVM_IOJS_PREFIX
-  SWIVM_IOJS_PREFIX="$(swivm_iojs_prefix)"
   local PROVIDED_VERSION
   PROVIDED_VERSION="$1"
   case "_$PROVIDED_VERSION" in
-    "_$SWIVM_IOJS_PREFIX" | "_io.js")
-      swivm_version "$SWIVM_IOJS_PREFIX"
-    ;;
     "_system")
       echo "system"
     ;;
@@ -937,25 +805,6 @@ swivm_match_version() {
       swivm_version "$PROVIDED_VERSION"
     ;;
   esac
-}
-
-swivm_npm_global_modules() {
-  local NPMLIST
-  local VERSION
-  VERSION="$1"
-  if [ "_$VERSION" = "_system" ]; then
-    NPMLIST=$(swivm use system > /dev/null && npm list -g --depth=0 2> /dev/null | command tail -n +2)
-  else
-    NPMLIST=$(swivm use "$VERSION" > /dev/null && npm list -g --depth=0 2> /dev/null | command tail -n +2)
-  fi
-
-  local INSTALLS
-  INSTALLS=$(echo "$NPMLIST" | command sed -e '/ -> / d' -e '/\(empty\)/ d' -e 's/^.* \(.*@[^ ]*\).*/\1/' -e '/^npm@[^ ]*.*$/ d' | command xargs)
-
-  local LINKS
-  LINKS="$(echo "$NPMLIST" | command sed -n 's/.* -> \(.*\)/\1/ p')"
-
-  echo "$INSTALLS //// $LINKS"
 }
 
 swivm_die_on_prefix() {
@@ -980,86 +829,6 @@ swivm_die_on_prefix() {
     echo >&2 "swivm is not compatible with the \"PREFIX\" environment variable: currently set to \"$PREFIX\""
     echo >&2 "Run \`unset PREFIX\` to unset it."
     return 3
-  fi
-
-  if [ -n "$NPM_CONFIG_PREFIX" ] && ! (swivm_tree_contains_path "$SWIVM_DIR" "$NPM_CONFIG_PREFIX" >/dev/null 2>&1); then
-    swivm deactivate >/dev/null 2>&1
-    echo >&2 "swivm is not compatible with the \"NPM_CONFIG_PREFIX\" environment variable: currently set to \"$NPM_CONFIG_PREFIX\""
-    echo >&2 "Run \`unset NPM_CONFIG_PREFIX\` to unset it."
-    return 4
-  fi
-
-  if ! swivm_has 'npm'; then
-    return
-  fi
-
-  local SWIVM_NPM_PREFIX
-  SWIVM_NPM_PREFIX="$(NPM_CONFIG_LOGLEVEL=warn npm config get prefix)"
-  if ! (swivm_tree_contains_path "$SWIVM_DIR" "$SWIVM_NPM_PREFIX" >/dev/null 2>&1); then
-    if [ "_$SWIVM_DELETE_PREFIX" = "_1" ]; then
-      NPM_CONFIG_LOGLEVEL=warn npm config delete prefix
-    else
-      swivm deactivate >/dev/null 2>&1
-      echo >&2 "swivm is not compatible with the npm config \"prefix\" option: currently set to \"$SWIVM_NPM_PREFIX\""
-      if swivm_has 'npm'; then
-        echo >&2 "Run \`npm config delete prefix\` or \`$SWIVM_COMMAND\` to unset it."
-      else
-        echo >&2 "Run \`$SWIVM_COMMAND\` to unset it."
-      fi
-      return 10
-    fi
-  fi
-}
-
-# Succeeds if $IOJS_VERSION represents an io.js version that has a
-# Solaris binary, fails otherwise.
-# Currently, only io.js 3.3.1 has a Solaris binary available, and it's the
-# latest io.js version available. The expectation is that any potential io.js
-# version later than v3.3.1 will also have Solaris binaries.
-iojs_version_has_solaris_binary() {
-  local IOJS_VERSION
-  IOJS_VERSION="$1"
-  local STRIPPED_IOJS_VERSION
-  STRIPPED_IOJS_VERSION="$(swivm_strip_iojs_prefix "$IOJS_VERSION")"
-  if [ "_$STRIPPED_IOJS_VERSION" = "$IOJS_VERSION" ]; then
-    return 1
-  fi
-
-  # io.js started shipping Solaris binaries with io.js v3.3.1
-  swivm_version_greater_than_or_equal_to "$STRIPPED_IOJS_VERSION" v3.3.1
-}
-
-# Succeeds if $NODE_VERSION represents a node version that has a
-# Solaris binary, fails otherwise.
-# Currently, node versions starting from v0.8.6 have a Solaris binary
-# avaliable.
-node_version_has_solaris_binary() {
-  local NODE_VERSION
-  NODE_VERSION="$1"
-  # Error out if $NODE_VERSION is actually an io.js version
-  local STRIPPED_IOJS_VERSION
-  STRIPPED_IOJS_VERSION="$(swivm_strip_iojs_prefix "$NODE_VERSION")"
-  if [ "_$STRIPPED_IOJS_VERSION" != "_$NODE_VERSION" ]; then
-    return 1
-  fi
-
-  # node (unmerged) started shipping Solaris binaries with v0.8.6 and
-  # node versions v1.0.0 or greater are not considered valid "unmerged" node
-  # versions.
-  swivm_version_greater_than_or_equal_to "$NODE_VERSION" v0.8.6 &&
-  ! swivm_version_greater_than_or_equal_to "$NODE_VERSION" v1.0.0
-}
-
-# Succeeds if $VERSION represents a version (node, io.js or merged) that has a
-# Solaris binary, fails otherwise.
-swivm_has_solaris_binary() {
-  local VERSION=$1
-  if swivm_is_merged_node_version "$VERSION"; then
-    return 0 # All merged node versions have a Solaris binary
-  elif swivm_is_iojs_version "$VERSION"; then
-    iojs_version_has_solaris_binary "$VERSION"
-  else
-    node_version_has_solaris_binary "$VERSION"
   fi
 }
 
@@ -1088,27 +857,22 @@ swivm() {
 
   case $1 in
     "help" )
-      local SWIVM_IOJS_PREFIX
-      SWIVM_IOJS_PREFIX="$(swivm_iojs_prefix)"
-      local SWIVM_NODE_PREFIX
-      SWIVM_NODE_PREFIX="$(swivm_node_prefix)"
       echo
       echo "SWI-Prolog Version Manager"
       echo
       echo 'Note: <version> refers to any version-like string swivm understands. This includes:'
-      echo '  - full or partial version numbers, starting with an optional "v" (0.10, v0.1.2, v1)'
-      echo "  - default (built-in) aliases: $SWIVM_NODE_PREFIX, stable, devel, $SWIVM_IOJS_PREFIX, system"
+      echo '  - full or partial version numbers, starting with an optional "v" (6.6, v7.2.3, v5)'
+      echo "  - default (built-in) aliases: stable, devel, system"
       echo '  - custom aliases you define with `swivm alias foo`'
       echo
       echo 'Usage:'
       echo '  swivm help                                  Show this message'
       echo '  swivm --version                             Print out the latest released version of swivm'
-      echo '  swivm install [-s] <version>                Download and install a <version>, [-s] from source. Uses .swivmrc if available'
-      echo '    --reinstall-packages-from=<version>     When installing, reinstall packages installed in <node|iojs|node version number>'
+      echo '  swivm install <version>                     Download and install a <version>. Uses .swivmrc if available'
       echo '  swivm uninstall <version>                   Uninstall a version'
       echo '  swivm use [--silent] <version>              Modify PATH to use <version>. Uses .swivmrc if available'
       echo '  swivm exec [--silent] <version> [<command>] Run <command> on <version>. Uses .swivmrc if available'
-      echo '  swivm run [--silent] <version> [<args>]     Run `node` on <version> with <args> as arguments. Uses .swivmrc if available'
+      echo '  swivm run [--silent] <version> [<args>]     Run `swipl` on <version> with <args> as arguments. Uses .swivmrc if available'
       echo '  swivm current                               Display currently activated version'
       echo '  swivm ls                                    List installed versions'
       echo '  swivm ls <version>                          List versions matching a given description'
@@ -1121,14 +885,14 @@ swivm() {
       echo '  swivm unalias <name>                        Deletes the alias named <name>'
       echo '  swivm reinstall-packages <version>          Reinstall global `npm` packages contained in <version> to current version'
       echo '  swivm unload                                Unload `swivm` from shell'
-      echo '  swivm which [<version>]                     Display path to installed node version. Uses .swivmrc if available'
+      echo '  swivm which [<version>]                     Display path to installed SWI-Prolog version. Uses .swivmrc if available'
       echo
       echo 'Example:'
-      echo '  swivm install v0.10.32                  Install a specific version number'
-      echo '  swivm use 0.10                          Use the latest available 0.10.x release'
-      echo '  swivm run 0.10.32 app.js                Run app.js using node v0.10.32'
-      echo '  swivm exec 0.10.32 node app.js          Run `node app.js` with the PATH pointing to node v0.10.32'
-      echo '  swivm alias default 0.10.32             Set default node version on a shell'
+      echo '  swivm install v6.6.2                    Install a specific version number'
+      echo '  swivm use 7                             Use the latest available 7.x.x release'
+      echo '  swivm run 6.6.2 example.pl              Run example.pl using SWI-Prolog v6.6.2'
+      echo '  swivm exec 6.6.2 swipl example.pl       Run `swipl example.pl` with the PATH pointing to SWI-Prolog v6.6.2'
+      echo '  swivm alias default 6.6.2               Set default SWI-Prolog version on a shell'
       echo
       echo 'Note:'
       echo '  to remove, delete, or uninstall swivm - just remove the `$SWIVM_DIR` folder (usually `~/.swivm`)'
@@ -1146,9 +910,8 @@ swivm() {
       echo >&2 "\$HOME: $HOME"
       echo >&2 "\$SWIVM_DIR: '$(swivm_sanitize_path "$SWIVM_DIR")'"
       echo >&2 "\$PREFIX: '$(swivm_sanitize_path "$PREFIX")'"
-      echo >&2 "\$NPM_CONFIG_PREFIX: '$(swivm_sanitize_path "$NPM_CONFIG_PREFIX")'"
       local SWIVM_DEBUG_OUTPUT
-      for SWIVM_DEBUG_COMMAND in 'swivm current' 'which node' 'which iojs' 'which npm' 'npm config get prefix' 'npm root -g'
+      for SWIVM_DEBUG_COMMAND in 'swivm current' 'which swipl'
       do
         SWIVM_DEBUG_OUTPUT="$($SWIVM_DEBUG_COMMAND 2>&1)"
         echo >&2 "$SWIVM_DEBUG_COMMAND: $(swivm_sanitize_path "$SWIVM_DEBUG_OUTPUT")"
@@ -1221,7 +984,7 @@ swivm() {
         return $?
       fi
 
-      swivm_install_node_source "$VERSION" "$ADDITIONAL_PARAMETERS"
+      swivm_install "$VERSION" "$ADDITIONAL_PARAMETERS"
     ;;
     "uninstall" )
       if [ $# -ne 2 ]; then
@@ -1231,21 +994,9 @@ swivm() {
 
       local PATTERN
       PATTERN="$2"
-      case "_$PATTERN" in
-        "_$(swivm_iojs_prefix)" | "_$(swivm_iojs_prefix)-" \
-        | "_$(swivm_node_prefix)" | "_$(swivm_node_prefix)-")
-          VERSION="$(swivm_version "$PATTERN")"
-        ;;
-        *)
-          VERSION="$(swivm_version "$PATTERN")"
-        ;;
-      esac
+      VERSION="$(swivm_version "$PATTERN")"
       if [ "_$VERSION" = "_$(swivm_ls_current)" ]; then
-        if swivm_is_iojs_version "$VERSION"; then
-          echo "swivm: Cannot uninstall currently-active io.js version, $VERSION (inferred from $PATTERN)." >&2
-        else
-          echo "swivm: Cannot uninstall currently-active node version, $VERSION (inferred from $PATTERN)." >&2
-        fi
+        echo "swivm: Cannot uninstall currently-active SWI-Prolog version, $VERSION (inferred from $PATTERN)." >&2
         return 1
       fi
 
@@ -1258,20 +1009,11 @@ swivm() {
 
       t="$VERSION-$(swivm_get_os)-$(swivm_get_arch)"
 
-      local SWIVM_PREFIX
       local SWIVM_SUCCESS_MSG
-      if swivm_is_iojs_version "$VERSION"; then
-        SWIVM_PREFIX="$(swivm_iojs_prefix)"
-        SWIVM_SUCCESS_MSG="Uninstalled io.js $(swivm_strip_iojs_prefix "$VERSION")"
-      else
-        SWIVM_PREFIX="$(swivm_node_prefix)"
-        SWIVM_SUCCESS_MSG="Uninstalled node $VERSION"
-      fi
+
+      SWIVM_SUCCESS_MSG="Uninstalled SWI-Prolog $VERSION"
       # Delete all files related to target version.
-      command rm -rf "$SWIVM_DIR/src/$SWIVM_PREFIX-$VERSION" \
-             "$SWIVM_DIR/src/$SWIVM_PREFIX-$VERSION.tar.*" \
-             "$SWIVM_DIR/bin/$SWIVM_PREFIX-${t}" \
-             "$SWIVM_DIR/bin/$SWIVM_PREFIX-${t}.tar.*" \
+      command rm -rf "$SWIVM_DIR/src/swipl-$VERSION.tar.*" \
              "$VERSION_PATH" 2>/dev/null
       echo "$SWIVM_SUCCESS_MSG"
 
@@ -1285,11 +1027,11 @@ swivm() {
       local NEWPATH
       NEWPATH="$(swivm_strip_path "$PATH" "/bin")"
       if [ "_$PATH" = "_$NEWPATH" ]; then
-        echo "Could not find $SWIVM_DIR/*/bin in \$PATH" >&2
+        echo "Could not find $(swivm_version_dir)/*/bin in \$PATH" >&2
       else
         export PATH="$NEWPATH"
         hash -r
-        echo "$SWIVM_DIR/*/bin removed from \$PATH"
+        echo "$(swivm_version_dir)/*/bin removed from \$PATH"
       fi
 
       NEWPATH="$(swivm_strip_path "$MANPATH" "/share/man")"
@@ -1298,12 +1040,6 @@ swivm() {
       else
         export MANPATH="$NEWPATH"
         echo "$SWIVM_DIR/*/share/man removed from \$MANPATH"
-      fi
-
-      NEWPATH="$(swivm_strip_path "$NODE_PATH" "/lib/node_modules")"
-      if [ "_$NODE_PATH" != "_$NEWPATH" ]; then
-        export NODE_PATH="$NEWPATH"
-        echo "$SWIVM_DIR/*/lib/node_modules removed from \$NODE_PATH"
       fi
     ;;
     "use" )
@@ -1344,19 +1080,14 @@ swivm() {
       fi
 
       if [ "_$VERSION" = '_system' ]; then
-        if swivm_has_system_node && swivm deactivate >/dev/null 2>&1; then
+        if swivm_has_system_swi && swivm deactivate >/dev/null 2>&1; then
           if [ $SWIVM_USE_SILENT -ne 1 ]; then
-            echo "Now using system version of node: $(node -v 2>/dev/null)$(swivm_print_npm_version)"
-          fi
-          return
-        elif swivm_has_system_iojs && swivm deactivate >/dev/null 2>&1; then
-          if [ $SWIVM_USE_SILENT -ne 1 ]; then
-            echo "Now using system version of io.js: $(iojs --version 2>/dev/null)$(swivm_print_npm_version)"
+            echo "Now using system version of SWI-Prolog: $(swipl -v 2>/dev/null)"
           fi
           return
         else
           if [ $SWIVM_USE_SILENT -ne 1 ]; then
-            echo "System version of node not found." >&2
+            echo "System version of SWI-Prolog not found." >&2
           fi
           return 127
         fi
@@ -1394,20 +1125,14 @@ swivm() {
       fi
       export PATH
       hash -r
-      export SWIVM_PATH="$SWIVM_VERSION_DIR/lib/node"
       export SWIVM_BIN="$SWIVM_VERSION_DIR/bin"
       if [ "$SWIVM_SYMLINK_CURRENT" = true ]; then
         command rm -f "$SWIVM_DIR/current" && ln -s "$SWIVM_VERSION_DIR" "$SWIVM_DIR/current"
       fi
       local SWIVM_USE_OUTPUT
-      if swivm_is_iojs_version "$VERSION"; then
-        if [ $SWIVM_USE_SILENT -ne 1 ]; then
-          SWIVM_USE_OUTPUT="Now using io.js $(swivm_strip_iojs_prefix "$VERSION")$(swivm_print_npm_version)"
-        fi
-      else
-        if [ $SWIVM_USE_SILENT -ne 1 ]; then
-          SWIVM_USE_OUTPUT="Now using node $VERSION$(swivm_print_npm_version)"
-        fi
+
+      if [ $SWIVM_USE_SILENT -ne 1 ]; then
+        SWIVM_USE_OUTPUT="Now using SWI-Prolog $VERSION"
       fi
       if [ "_$VERSION" != "_system" ]; then
         local SWIVM_USE_CMD
@@ -1430,7 +1155,7 @@ swivm() {
       local provided_version
       local has_checked_swivmrc
       has_checked_swivmrc=0
-      # run given version of node
+      # run given version of SWI-Prolog
       shift
 
       local SWIVM_SILENT
@@ -1475,11 +1200,6 @@ swivm() {
         fi
       fi
 
-      local SWIVM_IOJS
-      if swivm_is_iojs_version "$VERSION"; then
-        SWIVM_IOJS=true
-      fi
-
       local ARGS
       ARGS="$@"
       local OUTPUT
@@ -1495,19 +1215,11 @@ swivm() {
         swivm_ensure_version_installed "$provided_version"
         EXIT_CODE=$?
       elif [ -z "$ARGS" ]; then
-        if [ "$SWIVM_IOJS" = true ]; then
-          swivm exec "$VERSION" iojs
-        else
-          swivm exec "$VERSION" node
-        fi
-        EXIT_CODE="$?"
-      elif [ "$SWIVM_IOJS" = true ]; then
-        [ $SWIVM_SILENT -eq 1 ] || echo "Running io.js $(swivm_strip_iojs_prefix "$VERSION")$(swivm use --silent "$VERSION" && swivm_print_npm_version)"
-        OUTPUT="$(swivm use "$VERSION" >/dev/null && iojs $ARGS)"
+        swivm exec "$VERSION" swipl
         EXIT_CODE="$?"
       else
-        [ $SWIVM_SILENT -eq 1 ] || echo "Running node $VERSION$(swivm use --silent "$VERSION" && swivm_print_npm_version)"
-        OUTPUT="$(swivm use "$VERSION" >/dev/null && node $ARGS)"
+        [ $SWIVM_SILENT -eq 1 ] || echo "Running SWI-Prolog $VERSION$(swivm use --silent "$VERSION")"
+        OUTPUT="$(swivm use "$VERSION" >/dev/null && swipl $ARGS)"
         EXIT_CODE="$?"
       fi
       if [ "$ZHS_HAS_SHWORDSPLIT_UNSET" -eq 1 ] && swivm_has "unsetopt"; then
@@ -1551,7 +1263,7 @@ swivm() {
         return $EXIT_CODE
       fi
 
-      [ $SWIVM_SILENT -eq 1 ] || echo "Running node $VERSION$(swivm use --silent "$VERSION" && swivm_print_npm_version)"
+      [ $SWIVM_SILENT -eq 1 ] || echo "Running SWI-Prolog $VERSION$(swivm use --silent "$VERSION")"
       NODE_VERSION="$VERSION" "$SWIVM_DIR/swivm-exec" "$@"
     ;;
     "ls" | "list" )
@@ -1603,9 +1315,9 @@ swivm() {
       fi
 
       if [ "_$VERSION" = '_system' ]; then
-        if swivm_has_system_iojs >/dev/null 2>&1 || swivm_has_system_node >/dev/null 2>&1; then
+        if swivm_has_system_swi >/dev/null 2>&1; then
           local SWIVM_BIN
-          SWIVM_BIN="$(swivm use system >/dev/null 2>&1 && command which node)"
+          SWIVM_BIN="$(swivm use system >/dev/null 2>&1 && command which swipl)"
           if [ -n "$SWIVM_BIN" ]; then
             echo "$SWIVM_BIN"
             return
@@ -1613,7 +1325,7 @@ swivm() {
             return 1
           fi
         else
-          echo "System version of node not found." >&2
+          echo "System version of SWI-Prolog not found." >&2
           return 127
         fi
       elif [ "_$VERSION" = "_∞" ]; then
@@ -1628,7 +1340,7 @@ swivm() {
       fi
       local SWIVM_VERSION_DIR
       SWIVM_VERSION_DIR="$(swivm_version_path "$VERSION")"
-      echo "$SWIVM_VERSION_DIR/bin/node"
+      echo "$SWIVM_VERSION_DIR/bin/swipl"
     ;;
     "alias" )
       local SWIVM_ALIAS_DIR
@@ -1694,52 +1406,6 @@ swivm() {
       command rm -f "$SWIVM_ALIAS_DIR/$2"
       echo "Deleted alias $2"
     ;;
-    "reinstall-packages" | "copy-packages" )
-      if [ $# -ne 2 ]; then
-        >&2 swivm help
-        return 127
-      fi
-
-      local PROVIDED_VERSION
-      PROVIDED_VERSION="$2"
-
-      if [ "$PROVIDED_VERSION" = "$(swivm_ls_current)" ] || [ "$(swivm_version "$PROVIDED_VERSION")" = "$(swivm_ls_current)" ]; then
-        echo 'Can not reinstall packages from the current version of node.' >&2
-        return 2
-      fi
-
-      local VERSION
-      if [ "_$PROVIDED_VERSION" = "_system" ]; then
-        if ! swivm_has_system_node && ! swivm_has_system_iojs; then
-          echo 'No system version of node or io.js detected.' >&2
-          return 3
-        fi
-        VERSION="system"
-      else
-        VERSION="$(swivm_version "$PROVIDED_VERSION")"
-      fi
-
-      local NPMLIST
-      NPMLIST="$(swivm_npm_global_modules "$VERSION")"
-      local INSTALLS
-      local LINKS
-      INSTALLS="${NPMLIST%% //// *}"
-      LINKS="${NPMLIST##* //// }"
-
-      echo "Reinstalling global packages from $VERSION..."
-      echo "$INSTALLS" | command xargs npm install -g --quiet
-
-      echo "Linking global packages from $VERSION..."
-      set -f; IFS='
-' # necessary to turn off variable expansion except for newlines
-      for LINK in $LINKS; do
-        set +f; unset IFS # restore variable expansion
-        if [ -n "$LINK" ]; then
-          (cd "$LINK" && npm link)
-        fi
-      done
-      set +f; unset IFS # restore variable expansion in case $LINKS was empty
-    ;;
     "clear-cache" )
       command rm -f "$SWIVM_DIR/v*" "$(swivm_version_dir)" 2>/dev/null
       echo "Cache cleared."
@@ -1754,10 +1420,8 @@ swivm() {
       echo "0.1.0"
     ;;
     "unload" )
-      unset -f swivm swivm_print_versions swivm_checksum \
-        swivm_iojs_prefix swivm_node_prefix \
-        swivm_add_iojs_prefix \
-        swivm_is_iojs_version swivm_is_alias \
+      unset -f swivm swivm_print_versions \
+        swivm_is_stable_version swivm_is_devel_version \
         swivm_ls_remote swivm_ls_remote_index \
         swivm_ls swivm_remote_version swivm_remote_versions \
         swivm_install \
@@ -1765,18 +1429,17 @@ swivm() {
         swivm_ensure_default_set swivm_get_arch swivm_get_os \
         swivm_print_implicit_alias swivm_validate_implicit_alias \
         swivm_resolve_alias swivm_ls_current swivm_alias \
-        swivm_binary_available swivm_prepend_path swivm_strip_path \
-        swivm_num_version_groups swivm_format_version swivm_ensure_version_prefix \
+        swivm_prepend_path swivm_strip_path \
+        swivm_num_version_groups swivm_format_version \
         swivm_normalize_version swivm_is_valid_version \
         swivm_ensure_version_installed \
         swivm_version_path swivm_alias_path swivm_version_dir \
         swivm_find_swivmrc swivm_find_up swivm_tree_contains_path \
         swivm_version_greater swivm_version_greater_than_or_equal_to \
-        swivm_print_npm_version swivm_npm_global_modules \
-        swivm_has_system_node swivm_has_system_iojs \
+        swivm_has_system_swi \
         swivm_download swivm_get_latest swivm_has swivm_get_latest \
         swivm_supports_source_options swivm_supports_xz > /dev/null 2>&1
-      unset RC_VERSION SWIVM_NODEJS_ORG_MIRROR SWIVM_DIR SWIVM_CD_FLAGS > /dev/null 2>&1
+      unset RC_VERSION SWIVM_DIR SWIVM_CD_FLAGS > /dev/null 2>&1
     ;;
     * )
       >&2 swivm help
