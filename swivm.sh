@@ -1082,7 +1082,7 @@ swivm() {
       if [ "_$VERSION" = '_system' ]; then
         if swivm_has_system_swi && swivm deactivate >/dev/null 2>&1; then
           if [ $SWIVM_USE_SILENT -ne 1 ]; then
-            echo "Now using system version of SWI-Prolog: $(swipl -v 2>/dev/null)"
+            echo "Now using system version of SWI-Prolog: $(swipl --version 2>/dev/null | sed -r "s/^.* ([0-9](\.[0-9])*) .*$/\1/g")"
           fi
           return
         else
@@ -1264,7 +1264,7 @@ swivm() {
       fi
 
       [ $SWIVM_SILENT -eq 1 ] || echo "Running SWI-Prolog $VERSION$(swivm use --silent "$VERSION")"
-      NODE_VERSION="$VERSION" "$SWIVM_DIR/swivm-exec" "$@"
+      SWI_VERSION="$VERSION" "$SWIVM_DIR/swivm-exec" "$@"
     ;;
     "ls" | "list" )
       local SWIVM_LS_OUTPUT
