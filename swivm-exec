@@ -7,7 +7,7 @@ source "$DIR/swivm.sh"
 if [ -n "$SWI_VERSION" ]; then
   swivm use $SWI_VERSION > /dev/null || (echo "SWI_VERSION not set" >&2 && exit 127)
 else
-  swivm use > /dev/null || (echo "No .nvmrc file found" >&2 && exit 127)
+  swivm use > /dev/null || (echo "No .swivmrc file found" >&2 && exit 127)
 fi
 
 exec $@

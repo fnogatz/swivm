@@ -20,24 +20,6 @@ swivm_is_alias() {
   \alias "$1" > /dev/null 2>&1
 }
 
-swivm_get_latest() {
-  local SWIVM_LATEST_URL
-  if swivm_has "curl"; then
-    SWIVM_LATEST_URL="$(curl -q -w "%{url_effective}\n" -L -s -S http://latest.swivm.sh -o /dev/null)"
-  elif swivm_has "wget"; then
-    SWIVM_LATEST_URL="$(wget http://latest.swivm.sh --server-response -O /dev/null 2>&1 | command awk '/^  Location: /{DEST=$2} END{ print DEST }')"
-  else
-    >&2 echo 'swivm needs curl or wget to proceed.'
-    return 1
-  fi
-  if [ "_$SWIVM_LATEST_URL" = "_" ]; then
-    >&2 echo "http://latest.swivm.sh did not redirect to the latest release on Github"
-    return 2
-  else
-    echo "$SWIVM_LATEST_URL" | command awk -F '/' '{print $NF}'
-  fi
-}
-
 swivm_download() {
   if swivm_has "curl"; then
     curl -q $*
@@ -883,7 +865,6 @@ swivm() {
       echo '  swivm alias [<pattern>]                     Show all aliases beginning with <pattern>'
       echo '  swivm alias <name> <version>                Set an alias named <name> pointing to <version>'
       echo '  swivm unalias <name>                        Deletes the alias named <name>'
-      echo '  swivm reinstall-packages <version>          Reinstall global `npm` packages contained in <version> to current version'
       echo '  swivm unload                                Unload `swivm` from shell'
       echo '  swivm which [<version>]                     Display path to installed SWI-Prolog version. Uses .swivmrc if available'
       echo
@@ -1437,7 +1418,7 @@ swivm() {
         swivm_find_swivmrc swivm_find_up swivm_tree_contains_path \
         swivm_version_greater swivm_version_greater_than_or_equal_to \
         swivm_has_system_swi \
-        swivm_download swivm_get_latest swivm_has swivm_get_latest \
+        swivm_download swivm_has \
         swivm_supports_source_options swivm_supports_xz > /dev/null 2>&1
       unset RC_VERSION SWIVM_DIR SWIVM_CD_FLAGS > /dev/null 2>&1
     ;;

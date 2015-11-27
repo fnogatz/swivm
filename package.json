@@ -1,37 +1,20 @@
 {
-  "name": "nvm",
-  "version": "0.29.0",
-  "description": "Node Version Manager - Simple bash script to manage multiple active node.js versions",
-  "directories": {
-    "test": "test"
-  },
-  "scripts": {
-    "test": "shell=$(basename -- $(ps -o comm= $(ps -o ppid= -p $PPID)) | sed 's/^-//'); make test-$shell",
-    "test/fast": "shell=$(basename -- $(ps -o comm= $(ps -o ppid= -p $PPID)) | sed 's/^-//'); make TEST_SUITE=fast test-$shell",
-    "test/slow": "shell=$(basename -- $(ps -o comm= $(ps -o ppid= -p $PPID)) | sed 's/^-//'); make TEST_SUITE=slow test-$shell",
-    "test/install_script": "shell=$(basename -- $(ps -o comm= $(ps -o ppid= -p $PPID)) | sed 's/^-//'); make TEST_SUITE=install_script test-$shell",
-    "test/installation": "shell=$(basename -- $(ps -o comm= $(ps -o ppid= -p $PPID)) | sed 's/^-//'); make TEST_SUITE=installation test-$shell",
-    "test/sourcing": "shell=$(basename -- $(ps -o comm= $(ps -o ppid= -p $PPID)) | sed 's/^-//'); make TEST_SUITE=sourcing test-$shell"
-  },
+  "name": "swivm",
+  "version": "0.1.0",
+  "description": "SWI-Prolog Version Manager - Simple bash script to manage multiple active SWI-Prolog versions",
+  "scripts": {},
   "repository": {
     "type": "git",
-    "url": "git://github.com/creationix/nvm.git"
+    "url": "git://github.com/fnogatz/swivm.git"
   },
   "keywords": [
-    "nvm",
-    "node",
+    "swivm",
+    "swi",
+    "prolog",
     "version",
     "manager"
   ],
-  "author": "Tim Caswell <tim@creationix.com>",
+  "author": "Falco Nogatz <fnogatz@gmail.com>",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/creationix/nvm/issues"
-  },
-  "homepage": "https://github.com/creationix/nvm",
-  "devDependencies": {
-    "replace": "^0.3.0",
-    "semver": "^5.0.1",
-    "urchin": "^0.0.5"
-  }
+  "homepage": "https://github.com/fnogatz/swivm"
 }
