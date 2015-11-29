@@ -1,6 +1,6 @@
 {
   "name": "swivm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "SWI-Prolog Version Manager - Simple bash script to manage multiple active SWI-Prolog versions",
   "scripts": {},
   "repository": {
