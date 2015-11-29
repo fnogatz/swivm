@@ -16,5 +16,9 @@
   ],
   "author": "Falco Nogatz <fnogatz@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/fnogatz/swivm"
+  "homepage": "https://github.com/fnogatz/swivm",
+  "devDependencies": {
+    "replace": "^0.3.0",
+    "semver": "^5.0.1"
+  }
 }
