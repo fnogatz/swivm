@@ -9,7 +9,7 @@ UTILS := replace semver
 	# Make sure that all required utilities can be located.
 UTIL_CHECK := $(or $(shell PATH="$(PATH)" which $(UTILS) >/dev/null && echo 'ok'),$(error Did you forget to run `npm install` after cloning the repo? At least one of the required supporting utilities not found: $(UTILS)))
 	# The files that need updating when incrementing the version number.
-VERSIONED_FILES := nvm.sh install.sh README.md package.json
+VERSIONED_FILES := swivm.sh install.sh README.md package.json
 
 
 # Default target (by virtue of being the first non '.'-prefixed in the file).
