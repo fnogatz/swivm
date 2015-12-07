@@ -1,8 +1,10 @@
 {
   "name": "swivm",
   "version": "0.1.1",
-  "description": "SWI-Prolog Version Manager - Simple bash script to manage multiple active SWI-Prolog versions",
+  "description": "SWI-Prolog Version Manager - Bash script to manage multiple active SWI-Prolog versions",
   "scripts": {},
+  "preferGlobal": true,
+  "bin": "./swivm-exec",
   "repository": {
     "type": "git",
     "url": "git://github.com/fnogatz/swivm.git"
