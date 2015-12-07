@@ -3,8 +3,6 @@
   "version": "0.1.2",
   "description": "SWI-Prolog Version Manager - Bash script to manage multiple active SWI-Prolog versions",
   "scripts": {},
-  "preferGlobal": true,
-  "bin": "./swivm-exec",
   "repository": {
     "type": "git",
     "url": "git://github.com/fnogatz/swivm.git"
