@@ -744,12 +744,12 @@ swivm_install() {
   local tmptarball
   tmptarball="$tmpdir/swipl-$VERSION.tar.gz"
 
-  if [ "$(swivm_download -L -s -I "$GITHUB_MIRROR/V$VERSION.tar.gz" -o - 2>&1 | command grep '200 OK')" != '' ]; then
-    tarball="$GITHUB_MIRROR/V$VERSION.tar.gz"
-  elif [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz" -o - | command grep '200 OK')" != '' ]; then
+  if [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz" -o - | command grep '200 OK')" != '' ]; then
     tarball="$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz"
   elif [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz" -o - | command grep '200 OK')" != '' ]; then
     tarball="$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz"
+  elif [ "$(swivm_download -L -s -I "$GITHUB_MIRROR/V$VERSION.tar.gz" -o - 2>&1 | command grep '200 OK')" != '' ]; then
+    tarball="$GITHUB_MIRROR/V$VERSION.tar.gz"
   fi
 
   local SRC_PATH
@@ -760,7 +760,7 @@ swivm_install() {
     swivm_download -L --progress-bar "$tarball" -o "$tmptarball" && \
     command tar -xzf "$tmptarball" -C "$tmpdir" && \
     command mkdir -p "$SWIVM_DIR/versions" && \
-    mv "$tmpdir/swipl-devel-$VERSION" "$VERSION_PATH" && \
+    (mv "$tmpdir/swipl-$VERSION" "$VERSION_PATH" 2>&1 || mv "$tmpdir/pl-$VERSION" "$VERSION_PATH") && \
     cd "$VERSION_PATH" && \
     echo "### [SWIVM] Prepare Installation Template ###" && \
     cp build.templ build && \
@@ -775,7 +775,7 @@ swivm_install() {
     ./configure && \
     $MAKE && \
     echo "### [SWIVM] Install Packages ###" && \
-    $MAKE install
+    make install
     )
   then
     echo "swivm: install $VERSION failed!" >&2
