@@ -11,7 +11,7 @@ if [ -z "$SWIVM_DIR" ]; then
 fi
 
 swivm_latest_version() {
-  echo "v0.1.3"
+  echo "v0.2.0"
 }
 
 #
