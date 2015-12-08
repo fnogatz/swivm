@@ -878,11 +878,11 @@ swivm() {
       echo '  swivm which [<version>]                     Display path to installed SWI-Prolog version. Uses .swivmrc if available'
       echo
       echo 'Example:'
-      echo '  swivm install v6.6.2                    Install a specific version number'
-      echo '  swivm use 7                             Use the latest available 7.x.x release'
-      echo '  swivm run 6.6.2 example.pl              Run example.pl using SWI-Prolog v6.6.2'
-      echo '  swivm exec 6.6.2 swipl example.pl       Run `swipl example.pl` with the PATH pointing to SWI-Prolog v6.6.2'
-      echo '  swivm alias default 6.6.2               Set default SWI-Prolog version on a shell'
+      echo '  swivm install v6.6.2                        Install a specific version number'
+      echo '  swivm use 7                                 Use the latest available 7.x.x release'
+      echo '  swivm run 6.6.2 example.pl                  Run example.pl using SWI-Prolog v6.6.2'
+      echo '  swivm exec 6.6.2 swipl example.pl           Run `swipl example.pl` with the PATH pointing to SWI-Prolog v6.6.2'
+      echo '  swivm alias default 6.6.2                   Set default SWI-Prolog version on a shell'
       echo
       echo 'Note:'
       echo '  to remove, delete, or uninstall swivm - just remove the `$SWIVM_DIR` folder (usually `~/.swivm`)'
