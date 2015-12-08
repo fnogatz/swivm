@@ -6,6 +6,20 @@ SWIVM, the SWI-Prolog Version Manager, is a bash script to manage multiple activ
 
 `swivm` does not support Windows so far. Make sure your system has the requirements for a manual SWI-Prolog installation from source. Typically GNU make is required.
 
+### Packages
+
+To use SWI-Prolog's XPCE package, the following libraries are required:
+- libXt
+- libjpeg
+- libxpm
+- libxft
+
+Typically they can be installed using:
+
+```
+sudo apt-get install libxt-dev libjpeg-dev libxpm-dev libxft-dev
+```
+
 ### Install script
 
 To install or update swivm, you can use the [install script](https://github.com/fnogatz/swivm/blob/v0.1.3/install.sh) using cURL:

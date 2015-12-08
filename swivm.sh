@@ -757,16 +757,25 @@ swivm_install() {
     [ -n "$tarball" ] && \
     command mkdir -p "$tmpdir" && \
     echo "Downloading $tarball..." && \
-    command mkdir -p "$VERSION_PATH" && \
     swivm_download -L --progress-bar "$tarball" -o "$tmptarball" && \
-    command tar -xzf "$tmptarball" -C "$VERSION_PATH" && \
+    command tar -xzf "$tmptarball" -C "$tmpdir" && \
+    command mkdir -p "$SWIVM_DIR/versions" && \
+    mv "$tmpdir/swipl-devel-$VERSION" "$VERSION_PATH" && \
     cd "$VERSION_PATH" && \
-    mv "swipl-devel-$VERSION"/* . && \
+    echo "### [SWIVM] Prepare Installation Template ###" && \
     cp build.templ build && \
     sed -i "s@PREFIX=\$HOME@PREFIX=$VERSION_PATH@g" build && \
     sed -i "s@MAKE=make@MAKE=$make@g" build && \
+    echo "### [SWIVM] Prepare SWI-Prolog ###" && \
     ./prepare --yes --all && \
-    ./build
+    echo "### [SWIVM] Build SWI-Prolog ###" && \
+    ./build && \
+    cd packages && \
+    echo "### [SWIVM] Configure Packages ###" && \
+    ./configure && \
+    $MAKE && \
+    echo "### [SWIVM] Install Packages ###" && \
+    $MAKE install
     )
   then
     echo "swivm: install $VERSION failed!" >&2
