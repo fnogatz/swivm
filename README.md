@@ -16,13 +16,13 @@ Additionally a Java compiler is required, so make sure `javac -version` is possi
 
 ### Install script
 
-To install or update swivm, you can use the [install script](https://github.com/fnogatz/swivm/blob/v0.2.1/install.sh) using cURL:
+To install or update swivm, you can use the [install script](https://github.com/fnogatz/swivm/blob/v0.2.2/install.sh) using cURL:
 
-    curl -o- https://raw.githubusercontent.com/fnogatz/swivm/v0.2.1/install.sh | bash
+    curl -o- https://raw.githubusercontent.com/fnogatz/swivm/v0.2.2/install.sh | bash
 
 or Wget:
 
-    wget -qO- https://raw.githubusercontent.com/fnogatz/swivm/v0.2.1/install.sh | bash
+    wget -qO- https://raw.githubusercontent.com/fnogatz/swivm/v0.2.2/install.sh | bash
 
 <sub>The script clones the swivm repository to `~/.swivm` and adds the source line to your profile (`~/.bash_profile`, `~/.zshrc` or `~/.profile`).</sub>
 
