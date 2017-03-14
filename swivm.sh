@@ -1059,6 +1059,8 @@ swivm() {
         if [ -n "$SWIVM_RC_VERSION" ]; then
           PROVIDED_VERSION="$SWIVM_RC_VERSION"
           VERSION="$(swivm_version "$PROVIDED_VERSION")"
+        else
+          VERSION="$(swivm_match_version)"
         fi
       else
         VERSION="$(swivm_match_version "$PROVIDED_VERSION")"
