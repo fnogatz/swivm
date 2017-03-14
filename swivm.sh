@@ -181,9 +181,11 @@ swivm_version() {
   local PATTERN
   PATTERN="$1"
   local VERSION
-  # The default version is the current one
+  # The default version is the highest of the installed
   if [ -z "$PATTERN" ]; then
-    PATTERN='current'
+    VERSION="$(swivm_ls | command sort | command tail -n1)"
+    echo "$VERSION"
+    return 0
   fi
 
   if [ "$PATTERN" = "current" ]; then
