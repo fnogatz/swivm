@@ -564,11 +564,11 @@ swivm_print_versions() {
   SWIVM_CURRENT=$(swivm_ls_current)
   echo "$1" | while read -r VERSION; do
     if [ "_$VERSION" = "_$SWIVM_CURRENT" ]; then
-      FORMAT='\033[0;32m-> %12s\033[0m'
+      FORMAT='\0.3.1;32m-> %12s\0.3.1m'
     elif [ "$VERSION" = "system" ]; then
-      FORMAT='\033[0;33m%15s\033[0m'
+      FORMAT='\0.3.1;33m%15s\0.3.1m'
     elif [ -d "$(swivm_version_path "$VERSION" 2> /dev/null)" ]; then
-      FORMAT='\033[0;34m%15s\033[0m'
+      FORMAT='\0.3.1;34m%15s\0.3.1m'
     else
       FORMAT='%15s'
     fi
@@ -1411,7 +1411,7 @@ swivm() {
       swivm_remote_version "$2"
     ;;
     "--version" )
-      echo "0.3.0"
+      echo "0.3.1"
     ;;
     "unload" )
       unset -f swivm swivm_print_versions \
