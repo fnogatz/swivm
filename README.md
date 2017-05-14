@@ -9,14 +9,15 @@ SWIVM, the SWI-Prolog Version Manager, is a bash script to manage multiple activ
 Typically, the following libraries are required:
 
 ```
-sudo apt-get install autoconf make libgmp-dev libxt-dev libjpeg-dev libxpm-dev libxft-dev libdb-dev libssl-dev unixodbc-dev
+sudo apt-get install autoconf make libgmp-dev libxt-dev libjpeg-dev libxpm-dev libxft-dev libdb-dev libssl-dev unixodbc-dev libarchive-dev
 ```
 
 If you want to reduce resources, the following packages are optional:
 
 - `unixodbc-dev`: Without, you have no ODBC database connectivity (e.g., MySQL)
 - `libssl-dev`: Without, you have no SSL (and HTTPS) support.
-- `libgmp-dev`: Without, you lack unbounded integer support, rational numbers, good random number generators, etc. 
+- `libgmp-dev`: Without, you lack unbounded integer support, rational numbers, good random number generators, etc.
+- `libarchive-dev`: Without, you can not unpack and install add-ons.
 
 Additionally a Java compiler is required, so make sure `javac -version` is possible.
 
