@@ -108,7 +108,7 @@ To set a default SWI-Prolog version to be used in any new shell, use the alias '
 
 ## Problems
 
-If you try to install a SWI-Prolog version and the installation fails, be sure to delete the SWI-Prolog downloads from src (~/.swivm/src/) and versions (~/.swivm/versions/) or you might get an error when trying to reinstall them again.
+If you try to install a SWI-Prolog version and the installation fails, be sure to delete the SWI-Prolog downloads from src (\~/.swivm/src/) and versions (\~/.swivm/versions/) or you might get an error when trying to reinstall them again.
 
 ## License
 
