@@ -80,12 +80,12 @@ You can also get the path to the executable to where it was installed:
 
     swivm which 7.2
 
-In place of a version pointer like "6.2" or "v7.3" or "6.6.8", you can use the following special aliases with `swivm install`, `swivm use`, `swivm run`, `swivm exec`, `swivm which`, etc:
+In place of a version pointer like "6.2" or "v7.3" or "6.6.8", you can use the following special aliases with `swivm install`, `swivm use`, `swivm run`, `swivm exec`, `swivm which`, etc.:
 
  - `stable`: this alias points to the most recent SWI-Prolog version with an even minor version number.
  - `devel`: this alias points to the most recent SWI-Prolog version with an odd minor version number.
 
-If you want to use the system-installed version of SWI-Prolog, you can use the special default alias "system":
+If you want to use the system-installed version of SWI-Prolog, you can use the special default alias "system". The system version is this one not installed by swivm. If you have installed SWI-Prolog by, e.g., `apt-get install swi-prolog` or system-wide self-compiled, this will be the system version.
 
     swivm use system
     swivm run system --version
