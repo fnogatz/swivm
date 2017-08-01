@@ -48,3 +48,7 @@ release: _ensure-tag _ensure-clean
 	 replace "$$old_ver" "$$new_ver" -- $(VERSIONED_FILES) && \
 	 git commit -m "v$$new_ver" $(VERSIONED_FILES) && \
 	 git tag -a -m "v$$new_ver" "v$$new_ver"
+
+release-github:
+	@old_ver=`git describe --abbrev=0 --tags --match 'v[0-9]*.[0-9]*.[0-9]*'` || { echo "Failed to determine current version." >&2; exit 1; }; old_ver=$${old_ver#v} && \
+	hub release create -m "v$$old_ver" "v$$old_ver"
