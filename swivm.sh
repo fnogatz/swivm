@@ -317,7 +317,7 @@ swivm_ls_current() {
     echo 'none'
   elif swivm_tree_contains_path "$SWIVM_DIR" "$SWIVM_LS_CURRENT_SWIPL_PATH"; then
     local VERSION
-    VERSION="$(swipl --version 2>/dev/null | sed -r "s/^.* ([0-9](\.[0-9])*) .*$/\1/g")"
+    VERSION="$(swipl --version 2>/dev/null | sed -E "s/^.* ([0-9](\.[0-9])*) .*$/\1/g")"
     echo "$VERSION"
   else
     echo 'system'
@@ -544,7 +544,7 @@ swivm_ls_remote_index() {
   fi
   VERSIONS="$(swivm_download -L -s "$MIRROR/devel/src/" "$MIRROR/stable/src/" -o - \
     | command grep -E 'a href=\"(swi)?pl\-' \
-    | command sed -r 's/^.*a href="(swi)?pl\-(.*)\.tar\.gz".*$/\2/' \
+    | command sed -E 's/^.*a href="(swi)?pl\-(.*)\.tar\.gz".*$/\2/' \
     | command grep -w "^$PATTERN" \
     | $SORT_COMMAND)"
   if [ "$ZHS_HAS_SHWORDSPLIT_UNSET" -eq 1 ] && swivm_has "unsetopt"; then
@@ -1076,7 +1076,7 @@ swivm() {
       if [ "_$VERSION" = '_system' ]; then
         if swivm_has_system_swi && swivm deactivate >/dev/null 2>&1; then
           if [ $SWIVM_USE_SILENT -ne 1 ]; then
-            echo "Now using system version of SWI-Prolog: $(swipl --version 2>/dev/null | sed -r "s/^.* ([0-9](\.[0-9])*) .*$/\1/g")"
+            echo "Now using system version of SWI-Prolog: $(swipl --version 2>/dev/null | sed -E "s/^.* ([0-9](\.[0-9])*) .*$/\1/g")"
           fi
           return
         else
