@@ -418,6 +418,8 @@ swivm_is_stable_version() {
 }
 
 swivm_ls() {
+  local SORT_COMMAND
+  SORT_COMMAND='sort -t. -u -k 1,1n -k 2,2n -k 3,3n'
   local PATTERN
   PATTERN="$1"
   local VERSIONS
@@ -478,14 +480,13 @@ swivm_ls() {
     if [ -z "$PATTERN" ]; then
       PATTERN=''
     fi
-echo "$PATTERN";
     if [ -n "$SWIVM_DIRS_TO_SEARCH" ]; then
       VERSIONS="$(command find "$SWIVM_DIRS_TO_SEARCH" -maxdepth 1 -type d -name "$PATTERN*" \
         | command sed "
             s#^$SWIVM_DIR/##;
             \#^versions\$# d;
             s#^versions/##" \
-        | command sort -t. -u -k 2.2,2n -k 3,3n -k 4,4n \
+        | $SORT_COMMAND \
       )"
     fi
 
