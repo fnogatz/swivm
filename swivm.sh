@@ -478,6 +478,7 @@ swivm_ls() {
     if [ -z "$PATTERN" ]; then
       PATTERN=''
     fi
+echo "$PATTERN";
     if [ -n "$SWIVM_DIRS_TO_SEARCH" ]; then
       VERSIONS="$(command find "$SWIVM_DIRS_TO_SEARCH" -maxdepth 1 -type d -name "$PATTERN*" \
         | command sed "
@@ -562,17 +563,17 @@ swivm_print_versions() {
   local FORMAT
   local SWIVM_CURRENT
   SWIVM_CURRENT=$(swivm_ls_current)
-  echo "$1" | while read -r VERSION; do
+  echo "$1" | while read -r VERSION_LINE; do
+    FORMAT='%15s'
+    VERSION="${VERSION_LINE%% *}"
     if [ "_$VERSION" = "_$SWIVM_CURRENT" ]; then
-      FORMAT='\0.3.3;32m-> %12s\0.3.3m'
+      FORMAT='-> %12s *'
     elif [ "$VERSION" = "system" ]; then
-      FORMAT='\0.3.3;33m%15s\0.3.3m'
-    elif [ -d "$(swivm_version_path "$VERSION" 2> /dev/null)" ]; then
-      FORMAT='\0.3.3;34m%15s\0.3.3m'
-    else
       FORMAT='%15s'
+    elif [ -d "$(swivm_version_path "$VERSION" 2> /dev/null)" ]; then
+      FORMAT='%15s *'
     fi
-    command printf "$FORMAT\n" "$VERSION"
+    command printf -- "${FORMAT}\\n" "$VERSION"
   done
 }
 
