@@ -767,9 +767,10 @@ swivm_install() {
     (mv "$tmpdir/swipl-$VERSION" "$VERSION_PATH" 2>&1 || mv "$tmpdir/pl-$VERSION" "$VERSION_PATH") && \
     cd "$VERSION_PATH" && \
     echo "### [SWIVM] Prepare Installation Template ###" && \
-    cp build.templ build && \
-    sed -i "s@PREFIX=\$HOME@PREFIX=$VERSION_PATH@g" build && \
-    sed -i "s@MAKE=make@MAKE=$make@g" build && \
+    sed -e "s@PREFIX=\$HOME@PREFIX=$VERSION_PATH@g" build.templ > build.templ.2 && \
+    sed -e "s@MAKE=make@MAKE=$make@g" build.templ.2 > build && \
+    rm build.templ.2 && \
+    chmod +x build && \
     echo "### [SWIVM] Prepare SWI-Prolog ###" && \
     ./prepare --yes --all && \
     echo "### [SWIVM] Build SWI-Prolog ###" && \
