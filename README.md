@@ -9,7 +9,7 @@ SWIVM, the SWI-Prolog Version Manager, is a bash script to manage multiple activ
 Typically, the following libraries are required:
 
 ```
-sudo apt-get install autoconf make libgmp-dev libxt-dev libjpeg-dev libxpm-dev libxft-dev libdb-dev libssl-dev unixodbc-dev libarchive-dev
+sudo apt-get install autoconf make libgmp-dev libxt-dev libjpeg-dev libxpm-dev libxft-dev libdb-dev libssl-dev unixodbc-dev libarchive-dev libreadline-dev libedit-dev libpcre3-dev
 ```
 
 If you want to reduce resources, the following packages are optional:
