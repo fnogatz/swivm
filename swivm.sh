@@ -12,12 +12,20 @@
 SWIVM_SCRIPT_SOURCE="$_"
 
 swivm_has() {
-  type "$1" > /dev/null 2>&1
+  type "${1-}" > /dev/null 2>&1
 }
 
 swivm_is_alias() {
   # this is intentionally not "command alias" so it works in zsh.
   \alias "$1" > /dev/null 2>&1
+}
+
+swivm_has_colors() {
+  local SWIVM_COLORS
+  if swivm_has tput; then
+    SWIVM_COLORS="$(tput -T "${TERM:-vt100}" colors)"
+  fi
+  [ "${SWIVM_COLORS:--1}" -ge 8 ]
 }
 
 swivm_download() {
@@ -564,15 +572,29 @@ swivm_print_versions() {
   local FORMAT
   local SWIVM_CURRENT
   SWIVM_CURRENT=$(swivm_ls_current)
+  local SWIVM_HAS_COLORS
+  if [ -z "${SWIVM_NO_COLORS-}" ] && swivm_has_colors; then
+    SWIVM_HAS_COLORS=1
+  fi
   echo "$1" | while read -r VERSION_LINE; do
     FORMAT='%15s'
     VERSION="${VERSION_LINE%% *}"
     if [ "_$VERSION" = "_$SWIVM_CURRENT" ]; then
-      FORMAT='-> %12s *'
+      if [ "${SWIVM_HAS_COLORS-}" = '1' ]; then
+        FORMAT='\033[0;32m-> %12s\033[0m'
+      else
+        FORMAT='-> %12s *'
+      fi
     elif [ "$VERSION" = "system" ]; then
-      FORMAT='%15s'
+      if [ "${SWIVM_HAS_COLORS-}" = '1' ]; then
+        FORMAT='\033[0;33m%15s\033[0m'
+      fi
     elif [ -d "$(swivm_version_path "$VERSION" 2> /dev/null)" ]; then
-      FORMAT='%15s *'
+      if [ "${SWIVM_HAS_COLORS-}" = '1' ]; then
+        FORMAT='\033[0;34m%15s\033[0m'
+      else
+        FORMAT='%15s *'
+      fi
     fi
     command printf -- "${FORMAT}\\n" "$VERSION"
   done
@@ -1434,7 +1456,7 @@ swivm() {
         swivm_find_swivmrc swivm_find_up swivm_tree_contains_path \
         swivm_version_greater swivm_version_greater_than_or_equal_to \
         swivm_has_system_swi \
-        swivm_download swivm_has \
+        swivm_download swivm_has swivm_has_colors \
         swivm_supports_source_options swivm_supports_xz > /dev/null 2>&1
       unset RC_VERSION SWIVM_DIR SWIVM_CD_FLAGS > /dev/null 2>&1
     ;;
