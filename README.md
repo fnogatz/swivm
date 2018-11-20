@@ -8,18 +8,38 @@ SWIVM, the SWI-Prolog Version Manager, is a bash script to manage multiple activ
 
 Typically, the following libraries are required:
 
-```
-sudo apt-get install autoconf make libgmp-dev libxt-dev libjpeg-dev libxpm-dev libxft-dev libdb-dev libssl-dev unixodbc-dev libarchive-dev libreadline-dev libedit-dev libpcre3-dev libyaml-dev
+```sh
+sudo apt-get install \
+        build-essential autoconf curl chrpath pkg-config \
+        ncurses-dev libreadline-dev libedit-dev \
+        libunwind-dev \
+        libgmp-dev \
+        libssl-dev \
+        unixodbc-dev \
+        zlib1g-dev libarchive-dev \
+        libossp-uuid-dev \
+        libxext-dev libice-dev libjpeg-dev libxinerama-dev libxft-dev \
+        libxpm-dev libxt-dev \
+        libdb-dev \
+        libpcre3-dev \
+        libyaml-dev \
+        openjdk-8-jdk junit \
+        make ninja-build
 ```
 
 If you want to reduce resources, the following packages are optional:
 
+- `openjdk-8-jdk junit`: Without, you do not have Java connectivity (JPL).
 - `unixodbc-dev`: Without, you have no ODBC database connectivity (e.g., MySQL)
 - `libssl-dev`: Without, you have no SSL (and HTTPS) support.
 - `libgmp-dev`: Without, you lack unbounded integer support, rational numbers, good random number generators, etc.
 - `libarchive-dev`: Without, you can not unpack and install add-ons.
+- `libpcre3-dev`: Without, you have no regular expression support ([library(pcre)](http://www.swi-prolog.org/pldoc/doc/_SWI_/library/pcre.pl)).
+- `libyaml-dev`: Without, you have no YAML support ([library(yaml)](http://www.swi-prolog.org/pldoc/doc/_SWI_/library/yaml.pl)).
 
 Additionally a Java compiler is required, so make sure `javac -version` is possible.
+
+Building SWI-Prolog v7.7.20+ requires cmake version 3.5 or later.
 
 ### Install script
 

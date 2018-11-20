@@ -325,7 +325,7 @@ swivm_ls_current() {
     echo 'none'
   elif swivm_tree_contains_path "$SWIVM_DIR" "$SWIVM_LS_CURRENT_SWIPL_PATH"; then
     local VERSION
-    VERSION="$(swipl --version 2>/dev/null | sed -E "s/^.* ([0-9](\.[0-9])*) .*$/\1/g")"
+    VERSION="$(swipl --version 2>/dev/null | sed -E "s/^.* ([0-9](\.[0-9]+)*) .*$/\1/g")"
     echo "$VERSION"
   else
     echo 'system'
@@ -788,21 +788,29 @@ swivm_install() {
     command mkdir -p "$SWIVM_DIR/versions" && \
     (mv "$tmpdir/swipl-$VERSION" "$VERSION_PATH" 2>&1 || mv "$tmpdir/pl-$VERSION" "$VERSION_PATH") && \
     cd "$VERSION_PATH" && \
-    echo "### [SWIVM] Prepare Installation Template ###" && \
-    sed -e "s@PREFIX=\$HOME@PREFIX=$VERSION_PATH@g" build.templ > build.templ.2 && \
-    sed -e "s@MAKE=make@MAKE=$make@g" build.templ.2 > build && \
-    rm build.templ.2 && \
-    chmod +x build && \
-    echo "### [SWIVM] Prepare SWI-Prolog ###" && \
-    ./prepare --yes --all && \
-    echo "### [SWIVM] Build SWI-Prolog ###" && \
-    ./build && \
-    cd packages && \
-    echo "### [SWIVM] Configure Packages ###" && \
-    ./configure && \
-    $MAKE && \
-    echo "### [SWIVM] Install Packages ###" && \
-    make install
+    ( ([[ -f CMakeLists.txt ]] && \
+      export SWIPL_INSTALL_PREFIX="$VERSION_PATH" && \
+      mkdir build && \
+      cd build && \
+      cmake .. && \
+      make && \
+      make install \
+    ) || ( \
+      echo "### [SWIVM] Prepare Installation Template ###" && \
+      sed -e "s@PREFIX=\$HOME@PREFIX=$VERSION_PATH@g" build.templ > build.templ.2 && \
+      sed -e "s@MAKE=make@MAKE=$make@g" build.templ.2 > build && \
+      rm build.templ.2 && \
+      chmod +x build && \
+      echo "### [SWIVM] Prepare SWI-Prolog ###" && \
+      ./prepare --yes --all && \
+      echo "### [SWIVM] Build SWI-Prolog ###" && \
+      ./build && \
+      cd packages && \
+      echo "### [SWIVM] Configure Packages ###" && \
+      ./configure && \
+      $MAKE && \
+      echo "### [SWIVM] Install Packages ###" && \
+      make install )) \
     )
   then
     echo "swivm: install $VERSION failed!" >&2
@@ -1457,7 +1465,7 @@ swivm() {
         swivm_version_greater swivm_version_greater_than_or_equal_to \
         swivm_has_system_swi \
         swivm_download swivm_has swivm_has_colors \
-        swivm_supports_source_options swivm_supports_xz > /dev/null 2>&1
+        swivm_supports_source_options > /dev/null 2>&1
       unset RC_VERSION SWIVM_DIR SWIVM_CD_FLAGS > /dev/null 2>&1
     ;;
     * )
@@ -1469,10 +1477,6 @@ swivm() {
 
 swivm_supports_source_options() {
   [ "_$(echo '[ $# -gt 0 ] && echo $1' | . /dev/stdin yes 2> /dev/null)" = "_yes" ]
-}
-
-swivm_supports_xz() {
-  command which xz >/dev/null 2>&1 && swivm_version_greater_than_or_equal_to "$1" "2.3.2"
 }
 
 SWIVM_VERSION="$(swivm_alias default 2>/dev/null || echo)"
