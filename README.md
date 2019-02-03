@@ -24,7 +24,8 @@ sudo apt-get install \
         libpcre3-dev \
         libyaml-dev \
         openjdk-8-jdk junit \
-        make ninja-build
+        make ninja-build \
+        cmake
 ```
 
 If you want to reduce resources, the following packages are optional:
