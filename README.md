@@ -25,7 +25,7 @@ sudo apt-get install \
         libyaml-dev \
         openjdk-8-jdk junit \
         make ninja-build \
-	cmake
+        cmake
 ```
 
 If you want to reduce resources, the following packages are optional:
