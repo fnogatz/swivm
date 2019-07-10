@@ -67,7 +67,7 @@ unset SWIVM_SCRIPT_SOURCE 2> /dev/null
 
 # Setup mirror location if not already set
 if [ -z "$SWIVM_MIRROR" ]; then
-  export SWIVM_MIRROR="http://www.swi-prolog.org/download"
+  export SWIVM_MIRROR="https://www.swi-prolog.org/download"
 fi
 if [ -z "$GITHUB_MIRROR" ]; then
   export GITHUB_MIRROR="https://github.com/SWI-Prolog/swipl-devel/archive"
