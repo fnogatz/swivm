@@ -770,11 +770,11 @@ swivm_install() {
   local tmptarball
   tmptarball="$tmpdir/swipl-$VERSION.tar.gz"
 
-  if [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz" -o - | command grep '200 OK')" != '' ]; then
+  if [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz" -o - | command grep '200 OK\|HTTP/2 200')" != '' ]; then
     tarball="$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz"
-  elif [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz" -o - | command grep '200 OK')" != '' ]; then
+  elif [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz" -o - | command grep '200 OK\|HTTP/2 200')" != '' ]; then
     tarball="$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz"
-  elif [ "$(swivm_download -L -s -I "$GITHUB_MIRROR/V$VERSION.tar.gz" -o - 2>&1 | command grep '200 OK')" != '' ]; then
+  elif [ "$(swivm_download -L -s -I "$GITHUB_MIRROR/V$VERSION.tar.gz" -o - 2>&1 | command grep '200 OK\|HTTP/2 200')" != '' ]; then
     tarball="$GITHUB_MIRROR/V$VERSION.tar.gz"
   fi
 
