@@ -786,7 +786,10 @@ swivm_install() {
     swivm_download -L --progress-bar "$tarball" -o "$tmptarball" && \
     command tar -xzf "$tmptarball" -C "$tmpdir" && \
     command mkdir -p "$SWIVM_DIR/versions" && \
-    (mv "$tmpdir/swipl-$VERSION" "$VERSION_PATH" 2>&1 || mv "$tmpdir/pl-$VERSION" "$VERSION_PATH") && \
+    ( mv "$tmpdir/swipl-$VERSION" "$VERSION_PATH" >/dev/null 2>&1 || \
+      mv "$tmpdir/pl-$VERSION" "$VERSION_PATH" >/dev/null 2>&1 || \
+      mv "$tmpdir/swipl-devel-$VERSION" "$VERSION_PATH" >/dev/null 2>&1 \
+    ) && \
     cd "$VERSION_PATH" && \
     ( ([[ -f CMakeLists.txt ]] && \
       export SWIPL_INSTALL_PREFIX="$VERSION_PATH" && \
