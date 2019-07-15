@@ -70,7 +70,7 @@ if [ -z "$SWIVM_MIRROR" ]; then
   export SWIVM_MIRROR="https://www.swi-prolog.org/download"
 fi
 if [ -z "$GITHUB_MIRROR" ]; then
-  export GITHUB_MIRROR="https://github.com/SWI-Prolog/swipl-devel/archive"
+  export GITHUB_MIRROR="https://github.com/SWI-Prolog"
 fi
 
 swivm_tree_contains_path() {
@@ -774,8 +774,8 @@ swivm_install() {
     tarball="$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz"
   elif [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz" -o - | command grep '200 OK\|HTTP/2 200')" != '' ]; then
     tarball="$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz"
-  elif [ "$(swivm_download -L -s -I "$GITHUB_MIRROR/V$VERSION.tar.gz" -o - 2>&1 | command grep '200 OK\|HTTP/2 200')" != '' ]; then
-    tarball="$GITHUB_MIRROR/V$VERSION.tar.gz"
+  elif [ "$(swivm_download -L -s -I "$GITHUB_MIRROR/swipl-devel/archive/V$VERSION.tar.gz" -o - 2>&1 | command grep '200 OK\|HTTP/2 200')" != '' ]; then
+    tarball="$GITHUB_MIRROR/swipl-devel/archive/V$VERSION.tar.gz"
   fi
 
   local SRC_PATH
@@ -790,6 +790,12 @@ swivm_install() {
       mv "$tmpdir/pl-$VERSION" "$VERSION_PATH" >/dev/null 2>&1 || \
       mv "$tmpdir/swipl-devel-$VERSION" "$VERSION_PATH" >/dev/null 2>&1 \
     ) && \
+    cd "$VERSION_PATH" && \
+    ( ([ "$tarball" = "$GITHUB_MIRROR/swipl-devel/archive/V$VERSION.tar.gz" ] && \
+      # downloaded from GitHub \
+      echo "Downloading packages..." && \
+      swivm_download_git_submodules "$VERSION" \
+    ) || true) && \
     cd "$VERSION_PATH" && \
     ( ([[ -f CMakeLists.txt ]] && \
       export SWIPL_INSTALL_PREFIX="$VERSION_PATH" && \
@@ -819,6 +825,47 @@ swivm_install() {
     echo "swivm: install $VERSION failed!" >&2
     return 1
   fi
+
+  return $?
+}
+
+swivm_download_git_submodules() {
+  local VERSION
+  VERSION="$1"
+
+  local VERSION_PATH
+  VERSION_PATH="$(swivm_version_path "$VERSION")"
+
+  local tmpdir
+  tmpdir="$VERSION_PATH/packages/src"
+
+  local tmptarball
+
+  command mkdir -p "$tmpdir"
+
+  command sed -e '/^\[submodule .*\]$/ {
+    N; /\n.*path = .*$/ {
+      N; /\n.*url = .*$/ {
+        s/\[submodule "\(.*\)"\]\n.*path = \(.*\)\n.*url = \.\.\/\(.*\)\.git$/\1 \2 \3/
+      }
+    }
+  }' "$VERSION_PATH/.gitmodules" | while read -r SUB_NAME SUB_PATH SUB_URL; do
+    if [[ "$SUB_NAME" != packages* ]]; then
+      # only packages
+      continue
+    fi
+
+    # remove currently empty directory if exists
+    if [ -d "$VERSION_PATH/$SUB_NAME" ]; then command rmdir "$VERSION_PATH/$SUB_NAME"; fi
+
+    tmptarball="$tmpdir/$SUB_URL.tar.gz"
+
+    echo "Downloading package $SUB_NAME..." && \
+    swivm_download -L --progress-bar "$GITHUB_MIRROR/$SUB_URL/archive/V$VERSION.tar.gz" -o "$tmptarball"
+    command tar -xzf "$tmptarball" -C "$VERSION_PATH/packages"
+    command mv "$VERSION_PATH/packages/$SUB_URL-$VERSION" "$VERSION_PATH/$SUB_NAME"
+
+  done
 
   return $?
 }
@@ -1467,6 +1514,7 @@ swivm() {
         swivm_find_swivmrc swivm_find_up swivm_tree_contains_path \
         swivm_version_greater swivm_version_greater_than_or_equal_to \
         swivm_has_system_swi \
+        swivm_download_git_submodules \
         swivm_download swivm_has swivm_has_colors \
         swivm_supports_source_options > /dev/null 2>&1
       unset RC_VERSION SWIVM_DIR SWIVM_CD_FLAGS > /dev/null 2>&1
