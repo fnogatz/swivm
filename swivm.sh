@@ -1494,7 +1494,7 @@ swivm() {
       swivm_remote_version "$2"
     ;;
     "--version" )
-      echo "0.5.4"
+      echo "0.6.0"
     ;;
     "unload" )
       unset -f swivm swivm_print_versions \
