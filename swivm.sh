@@ -182,11 +182,17 @@ swivm_version_path() {
   local VERSION
   VERSION="$1"
   if [ -z "$VERSION" ]; then
-    echo "version is required" >&2
+    swivm_echo "version is required" >&2
     return 3
   else
-    echo "$(swivm_version_dir)/$VERSION"
+    swivm_echo "$(swivm_version_dir)/$VERSION"
   fi
+}
+
+swivm_lib_path() {
+  local VERSION_PATH
+  VERSION_PATH="$1"
+  swivm_echo "${VERSION_PATH}/lib/swipl/lib/x86_64-linux"
 }
 
 swivm_ensure_version_installed() {
@@ -1149,6 +1155,19 @@ swivm_download_git_submodules() {
   return $?
 }
 
+swivm_lib() {
+  local VERSION
+  VERSION="$1"
+  local VERSION_PATH
+  VERSION_PATH="$(swivm_version_path "$VERSION")"
+  local LIB_PATH
+  LIB_PATH="$(swivm_lib_path "$VERSION_PATH")"
+
+  local LIBSO
+  command find "${LIB_PATH}"/* -name libswipl.so* -type l -prune  -print0 \
+    | xargs -0 sudo cp -f -s --target-directory=/usr/lib
+}
+
 swivm_match_version() {
   local PROVIDED_VERSION
   PROVIDED_VERSION="$1"
@@ -1268,6 +1287,7 @@ swivm() {
       echo '  swivm unalias <name>                        Deletes the alias named <name>'
       echo '  swivm unload                                Unload `swivm` from shell'
       echo '  swivm which [<version>]                     Display path to installed SWI-Prolog version. Uses .swivmrc if available'
+      echo '  swivm lib [<version>]                       Set symbolic links to libswipl.so in /usr/lib for <version>. Uses .swivmrc or current if available'
       echo
       echo 'Example:'
       echo '  swivm install v6.6.2                        Install a specific version number'
@@ -1897,6 +1917,44 @@ swivm() {
       command rm -f "${SWIVM_ALIAS_DIR}/${1}"
       swivm_echo "Deleted alias ${1} - restore it with \`swivm alias \"${1}\" \"${SWIVM_ALIAS_ORIGINAL}\"\`"
     ;;
+    "lib" )
+      local provided_version
+      provided_version="${1-}"
+      if [ $# -eq 0 ]; then
+        swivm_rc_version
+        if [ -n "${SWIVM_RC_VERSION}" ]; then
+          provided_version="${SWIVM_RC_VERSION}"
+          VERSION=$(swivm_version "${SWIVM_RC_VERSION}") ||:
+        else
+          VERSION=$(swivm_ls_current)
+        fi
+        unset SWIVM_RC_VERSION
+      elif [ "_${1}" != '_system' ]; then
+        VERSION="$(swivm_version "${provided_version}")" ||:
+      else
+        VERSION="${1-}"
+      fi
+      if [ -z "${VERSION}" ]; then
+        >&2 swivm --help
+        return 127
+      fi
+
+      if [ "_${VERSION}" = '_system' ]; then
+        swivm_err 'Setting links for system version of SWI-Prolog not supported.'
+        return 127
+      elif [ "_${VERSION}" = "_∞" ]; then
+        swivm_err "The alias \"$2\" leads to an infinite loop. Aborting."
+        return 8
+      fi
+
+      swivm_ensure_version_installed "${provided_version}"
+      EXIT_CODE=$?
+      if [ "${EXIT_CODE}" != "0" ]; then
+        return $EXIT_CODE
+      fi
+      
+      swivm_lib "${VERSION-}"
+    ;;
     "clear-cache" )
       command rm -f "$SWIVM_DIR/v*" "$(swivm_version_dir)" 2>/dev/null
       echo "Cache cleared."
@@ -1937,6 +1995,7 @@ swivm() {
         swivm_list_aliases swivm_make_alias swivm_print_alias_path \
         swivm_print_default_alias swivm_print_formatted_alias swivm_resolve_local_alias \
         swivm_sanitize_path swivm_has_colors swivm_process_parameters \
+        swivm_lib swivm_lib_path \
         swivm_is_zsh \
         >/dev/null 2>&1
       unset SWIVM_RC_VERSION SWIVM_MIRROR GITHUB_MIRROR SWIVM_DIR \
