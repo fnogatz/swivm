@@ -11,6 +11,22 @@
 
 SWIVM_SCRIPT_SOURCE="$_"
 
+swivm_is_zsh() {
+  [ -n "${ZSH_VERSION-}" ]
+}
+
+swivm_echo() {
+  command printf %s\\n "$*" 2>/dev/null
+}
+
+swivm_err() {
+  >&2 swivm_echo "$@"
+}
+
+swivm_grep() {
+  GREP_OPTIONS='' command grep "$@"
+}
+
 swivm_has() {
   type "${1-}" > /dev/null 2>&1
 }
@@ -45,6 +61,10 @@ swivm_download() {
 
 swivm_has_system_swi() {
   [ "$(swivm deactivate >/dev/null 2>&1 && command -v swipl)" != '' ]
+}
+
+swivm_is_version_installed() {
+  [ -n "${1-}" ] && [ -x "$(swivm_version_path "$1" 2>/dev/null)"/bin/swipl ]
 }
 
 # Make zsh glob matching behave same as bash
@@ -187,27 +207,24 @@ swivm_ensure_version_installed() {
 # Expand a version using the version cache
 swivm_version() {
   local PATTERN
-  PATTERN="$1"
+  PATTERN="${1-}"
   local VERSION
-  # The default version is the highest of the installed
-  if [ -z "$PATTERN" ]; then
-    VERSION="$(swivm_ls | command sort | command tail -n1)"
-    echo "$VERSION"
-    return 0
+  # The default version is the current one
+  if [ -z "${PATTERN}" ]; then
+    PATTERN='current'
   fi
 
-  if [ "$PATTERN" = "current" ]; then
+  if [ "${PATTERN}" = "current" ]; then
     swivm_ls_current
     return $?
   fi
 
-  VERSION="$(swivm_ls "$PATTERN" | command tail -n1)"
-  if [ -z "$VERSION" ] || [ "_$VERSION" = "_N/A" ]; then
-    echo "N/A"
-    return 3;
-  else
-    echo "$VERSION"
+  VERSION="$(swivm_ls "${PATTERN}" | command tail -1)"
+  if [ -z "${VERSION}" ] || [ "_${VERSION}" = "_N/A" ]; then
+    swivm_echo "N/A"
+    return 3
   fi
+  swivm_echo "${VERSION}"
 }
 
 swivm_remote_version() {
@@ -256,6 +273,12 @@ swivm_normalize_version() {
   echo "${1#v}" | command awk -F. '{ printf("%d%06d%06d\n", $1,$2,$3); }'
 }
 
+swivm_ensure_version_prefix() {
+  local SWIVM_VERSION
+  SWIVM_VERSION="$(echo "${1-}" | command sed -e 's/^\([0-9]\)/v\1/g')"
+  swivm_echo "${SWIVM_VERSION}"
+}
+
 swivm_format_version() {
   local VERSION
   VERSION="$1"
@@ -300,6 +323,166 @@ swivm_prepend_path() {
   fi
 }
 
+swivm_change_path() {
+  # if there’s no initial path, just return the supplementary path
+  if [ -z "${1-}" ]; then
+    swivm_echo "${3-}${2-}"
+  # if the initial path doesn’t contain an swivm path, prepend the supplementary
+  # path
+  elif ! swivm_echo "${1-}" | swivm_grep -q "${NVM_DIR}/[^/]*${2-}" \
+    && ! swivm_echo "${1-}" | swivm_grep -q "${NVM_DIR}/versions/[^/]*/[^/]*${2-}"; then
+    swivm_echo "${3-}${2-}:${1-}"
+  # if the initial path contains BOTH an swivm path (checked for above) and
+  # that swivm path is preceded by a system binary path, just prepend the
+  # supplementary path instead of replacing it.
+  # https://github.com/nvm-sh/nvm/issues/1652#issuecomment-342571223
+  elif swivm_echo "${1-}" | swivm_grep -Eq "(^|:)(/usr(/local)?)?${2-}:.*${NVM_DIR}/[^/]*${2-}" \
+    || swivm_echo "${1-}" | swivm_grep -Eq "(^|:)(/usr(/local)?)?${2-}:.*${NVM_DIR}/versions/[^/]*/[^/]*${2-}"; then
+    swivm_echo "${3-}${2-}:${1-}"
+  # use sed to replace the existing swivm path with the supplementary path. This
+  # preserves the order of the path.
+  else
+    swivm_echo "${1-}" | command sed \
+      -e "s#${NVM_DIR}/[^/]*${2-}[^:]*#${3-}${2-}#" \
+      -e "s#${NVM_DIR}/versions/[^/]*/[^/]*${2-}[^:]*#${3-}${2-}#"
+  fi
+}
+
+swivm_print_formatted_alias() {
+  local ALIAS
+  ALIAS="${1-}"
+  local DEST
+  DEST="${2-}"
+  local VERSION
+  VERSION="${3-}"
+  if [ -z "${VERSION}" ]; then
+    VERSION="$(swivm_version "${DEST}")" ||:
+  fi
+  local VERSION_FORMAT
+  local ALIAS_FORMAT
+  local DEST_FORMAT
+  ALIAS_FORMAT='%s'
+  DEST_FORMAT='%s'
+  VERSION_FORMAT='%s'
+  local NEWLINE
+  NEWLINE='\n'
+  if [ "_${DEFAULT}" = '_true' ]; then
+    NEWLINE=' (default)\n'
+  fi
+  local ARROW
+  ARROW='->'
+  if [ -z "${SWIVM_NO_COLORS}" ] && swivm_has_colors; then
+    ARROW='\033[0;90m->\033[0m'
+    if [ "_${DEFAULT}" = '_true' ]; then
+      NEWLINE=' \033[0;37m(default)\033[0m\n'
+    fi
+    if [ "_${VERSION}" = "_${SWIVM_CURRENT-}" ]; then
+      ALIAS_FORMAT='\033[0;32m%s\033[0m'
+      DEST_FORMAT='\033[0;32m%s\033[0m'
+      VERSION_FORMAT='\033[0;32m%s\033[0m'
+    elif swivm_is_version_installed "${VERSION}"; then
+      ALIAS_FORMAT='\033[0;34m%s\033[0m'
+      DEST_FORMAT='\033[0;34m%s\033[0m'
+      VERSION_FORMAT='\033[0;34m%s\033[0m'
+    elif [ "${VERSION}" = '∞' ] || [ "${VERSION}" = 'N/A' ]; then
+      ALIAS_FORMAT='\033[1;31m%s\033[0m'
+      DEST_FORMAT='\033[1;31m%s\033[0m'
+      VERSION_FORMAT='\033[1;31m%s\033[0m'
+    fi
+  elif [ "_${VERSION}" != '_∞' ] && [ "_${VERSION}" != '_N/A' ]; then
+    VERSION_FORMAT='%s *'
+  fi
+  if [ "${DEST}" = "${VERSION}" ]; then
+    command printf -- "${ALIAS_FORMAT} ${ARROW} ${VERSION_FORMAT}${NEWLINE}" "${ALIAS}" "${DEST}"
+  else
+    command printf -- "${ALIAS_FORMAT} ${ARROW} ${DEST_FORMAT} (${ARROW} ${VERSION_FORMAT})${NEWLINE}" "${ALIAS}" "${DEST}" "${VERSION}"
+  fi
+}
+
+swivm_print_alias_path() {
+  local SWIVM_ALIAS_DIR
+  SWIVM_ALIAS_DIR="${1-}"
+  if [ -z "${SWIVM_ALIAS_DIR}" ]; then
+    swivm_err 'An alias dir is required.'
+    return 1
+  fi
+  local ALIAS_PATH
+  ALIAS_PATH="${2-}"
+  if [ -z "${ALIAS_PATH}" ]; then
+    swivm_err 'An alias path is required.'
+    return 2
+  fi
+  local ALIAS
+  ALIAS="${ALIAS_PATH##${SWIVM_ALIAS_DIR}\/}"
+  local DEST
+  DEST="$(swivm_alias "${ALIAS}" 2>/dev/null)" ||:
+  if [ -n "${DEST}" ]; then
+    SWIVM_NO_COLORS="${SWIVM_NO_COLORS-}" SWIVM_LTS="${SWIVM_LTS-}" DEFAULT=false swivm_print_formatted_alias "${ALIAS}" "${DEST}"
+  fi
+}
+
+swivm_print_default_alias() {
+  local ALIAS
+  ALIAS="${1-}"
+  if [ -z "${ALIAS}" ]; then
+    swivm_err 'A default alias is required.'
+    return 1
+  fi
+  local DEST
+  DEST="$(swivm_print_implicit_alias local "${ALIAS}")"
+  if [ -n "${DEST}" ]; then
+    SWIVM_NO_COLORS="${SWIVM_NO_COLORS-}" DEFAULT=true swivm_print_formatted_alias "${ALIAS}" "${DEST}"
+  fi
+}
+
+swivm_make_alias() {
+  local ALIAS
+  ALIAS="${1-}"
+  if [ -z "${ALIAS}" ]; then
+    swivm_err "an alias name is required"
+    return 1
+  fi
+  local VERSION
+  VERSION="${2-}"
+  if [ -z "${VERSION}" ]; then
+    swivm_err "an alias target version is required"
+    return 2
+  fi
+  swivm_echo "${VERSION}" | tee "$(swivm_alias_path)/${ALIAS}" >/dev/null
+}
+
+swivm_list_aliases() {
+  local ALIAS
+  ALIAS="${1-}"
+
+  local SWIVM_CURRENT
+  SWIVM_CURRENT="$(swivm_ls_current)"
+  local SWIVM_ALIAS_DIR
+  SWIVM_ALIAS_DIR="$(swivm_alias_path)"
+  command mkdir -p "${SWIVM_ALIAS_DIR}/lts"
+
+  (
+    local ALIAS_PATH
+    for ALIAS_PATH in "${SWIVM_ALIAS_DIR}/${ALIAS}"*; do
+      SWIVM_NO_COLORS="${SWIVM_NO_COLORS-}" SWIVM_CURRENT="${SWIVM_CURRENT}" swivm_print_alias_path "${SWIVM_ALIAS_DIR}" "${ALIAS_PATH}" &
+    done
+    wait
+  ) | sort
+
+  (
+    local ALIAS_NAME
+    for ALIAS_NAME in "stable" "devel"; do
+      {
+        if [ ! -f "${SWIVM_ALIAS_DIR}/${ALIAS_NAME}" ] && { [ -z "${ALIAS}" ] || [ "${ALIAS_NAME}" = "${ALIAS}" ]; }; then
+          SWIVM_NO_COLORS="${SWIVM_NO_COLORS-}" SWIVM_CURRENT="${SWIVM_CURRENT}" swivm_print_default_alias "${ALIAS_NAME}"
+        fi
+      } &
+    done
+    wait
+  ) | sort
+  return
+}
+
 swivm_alias() {
   local ALIAS
   ALIAS="$1"
@@ -319,62 +502,66 @@ swivm_alias() {
 }
 
 swivm_ls_current() {
-  local SWIVM_LS_CURRENT_SWIPL_PATH
-  SWIVM_LS_CURRENT_SWIPL_PATH="$(command which swipl 2> /dev/null)"
-  if [ $? -ne 0 ]; then
-    echo 'none'
-  elif swivm_tree_contains_path "$SWIVM_DIR" "$SWIVM_LS_CURRENT_SWIPL_PATH"; then
+  local SWIVM_LS_CURRENT_NODE_PATH
+  if ! SWIVM_LS_CURRENT_NODE_PATH="$(command which swipl 2>/dev/null)"; then
+    swivm_echo 'none'
+  elif swivm_tree_contains_path "${SWIVM_DIR}" "${SWIVM_LS_CURRENT_NODE_PATH}"; then
     local VERSION
-    VERSION="$(swipl --version 2>/dev/null | sed -E "s/^.* ([0-9](\.[0-9]+)*) .*$/\1/g")"
-    echo "$VERSION"
+    VERSION="$(swipl --version | sed -E "s/^.* ([0-9]+(\.[0-9]+)*) .*$/\1/g" 2>/dev/null)"
+    swivm_echo "v${VERSION}"
   else
-    echo 'system'
+    swivm_echo 'system'
   fi
 }
 
 swivm_resolve_alias() {
-  if [ -z "$1" ]; then
+  if [ -z "${1-}" ]; then
     return 1
   fi
 
   local PATTERN
-  PATTERN="$1"
+  PATTERN="${1-}"
 
   local ALIAS
-  ALIAS="$PATTERN"
+  ALIAS="${PATTERN}"
   local ALIAS_TEMP
 
   local SEEN_ALIASES
-  SEEN_ALIASES="$ALIAS"
+  SEEN_ALIASES="${ALIAS}"
   while true; do
-    ALIAS_TEMP="$(swivm_alias "$ALIAS" 2> /dev/null)"
+    ALIAS_TEMP="$(swivm_alias "${ALIAS}" 2>/dev/null || swivm_echo)"
 
-    if [ -z "$ALIAS_TEMP" ]; then
+    if [ -z "${ALIAS_TEMP}" ]; then
       break
     fi
 
-    if [ -n "$ALIAS_TEMP" ] \
-      && command printf "$SEEN_ALIASES" | command grep -e "^$ALIAS_TEMP$" > /dev/null; then
+    if command printf "${SEEN_ALIASES}" | swivm_grep -q -e "^${ALIAS_TEMP}$"; then
       ALIAS="∞"
       break
     fi
 
-    SEEN_ALIASES="$SEEN_ALIASES\n$ALIAS_TEMP"
-    ALIAS="$ALIAS_TEMP"
+    SEEN_ALIASES="${SEEN_ALIASES}\\n${ALIAS_TEMP}"
+    ALIAS="${ALIAS_TEMP}"
   done
 
-  if [ -n "$ALIAS" ] && [ "_$ALIAS" != "_$PATTERN" ]; then
-    case "_$ALIAS" in
-      "_∞" )
-        echo "$ALIAS"
+  if [ -n "${ALIAS}" ] && [ "_${ALIAS}" != "_${PATTERN}" ]; then
+    case "${ALIAS}" in
+      '∞')
+        swivm_echo "${ALIAS}"
+      ;;
+      *)
+        swivm_ensure_version_prefix "${ALIAS}"
       ;;
     esac
     return 0
   fi
 
-  if swivm_validate_implicit_alias "$PATTERN" 2> /dev/null ; then
+  if swivm_validate_implicit_alias "${PATTERN}" 2>/dev/null; then
     local IMPLICIT
-    IMPLICIT="$(swivm_print_implicit_alias local "$PATTERN" 2> /dev/null)"
+    IMPLICIT="$(swivm_print_implicit_alias local "${PATTERN}" 2>/dev/null)"
+    if [ -n "${IMPLICIT}" ]; then
+      swivm_ensure_version_prefix "${IMPLICIT}"
+    fi
   fi
 
   return 2
@@ -426,21 +613,24 @@ swivm_is_stable_version() {
 }
 
 swivm_ls() {
-  local SORT_COMMAND
-  SORT_COMMAND='sort -t. -u -k 1,1n -k 2,2n -k 3,3n'
   local PATTERN
-  PATTERN="$1"
+  PATTERN="${1-}"
   local VERSIONS
   VERSIONS=''
-  if [ "$PATTERN" = 'current' ]; then
+  if [ "${PATTERN}" = 'current' ]; then
     swivm_ls_current
     return
   fi
 
-  if swivm_resolve_local_alias "$PATTERN"; then
-    return
-  fi
-  if [ "_$PATTERN" = "_N/A" ]; then
+  case "${PATTERN}" in
+    *)
+      if swivm_resolve_local_alias "${PATTERN}"; then
+        return
+      fi
+      PATTERN="$(swivm_ensure_version_prefix "${PATTERN}")"
+    ;;
+  esac
+  if [ "${PATTERN}" = 'N/A' ]; then
     return
   fi
   # If it looks like an explicit version, don't do anything funny
@@ -449,85 +639,93 @@ swivm_ls() {
     v*) SWIVM_PATTERN_STARTS_WITH_V=true ;;
     *) SWIVM_PATTERN_STARTS_WITH_V=false ;;
   esac
-  if [ $SWIVM_PATTERN_STARTS_WITH_V = true ] && [ "_$(swivm_num_version_groups "$PATTERN")" = "_3" ]; then
-    if [ -d "$(swivm_version_path "$PATTERN")" ]; then
-      VERSIONS="$PATTERN"
+  if [ $SWIVM_PATTERN_STARTS_WITH_V = true ] && [ "_$(swivm_num_version_groups "${PATTERN}")" = "_3" ]; then
+    if swivm_is_version_installed "${PATTERN}"; then
+      VERSIONS="${PATTERN}"
     fi
   else
-    case "$PATTERN" in
+    case "${PATTERN}" in
       "system") ;;
       *)
         local NUM_VERSION_GROUPS
-        NUM_VERSION_GROUPS="$(swivm_num_version_groups "$PATTERN")"
-        if [ "_$NUM_VERSION_GROUPS" = "_2" ] || [ "_$NUM_VERSION_GROUPS" = "_1" ]; then
+        NUM_VERSION_GROUPS="$(swivm_num_version_groups "${PATTERN}")"
+        if [ "${NUM_VERSION_GROUPS}" = "2" ] || [ "${NUM_VERSION_GROUPS}" = "1" ]; then
           PATTERN="${PATTERN%.}."
         fi
       ;;
     esac
 
-    local ZHS_HAS_SHWORDSPLIT_UNSET
-    ZHS_HAS_SHWORDSPLIT_UNSET=1
-    if swivm_has "setopt"; then
-      ZHS_HAS_SHWORDSPLIT_UNSET=$(setopt | command grep shwordsplit > /dev/null ; echo $?)
-      setopt shwordsplit
-    fi
+    swivm_is_zsh && setopt local_options shwordsplit
 
-    local SWIVM_DIRS_TO_SEARCH
-    SWIVM_DIRS_TO_SEARCH="$(swivm_version_dir)"
-    local SWIVM_ADD_SYSTEM
+    local SWIVM_DIRS_TO_SEARCH1
+    SWIVM_DIRS_TO_SEARCH1=''
     SWIVM_ADD_SYSTEM=false
 
-    if swivm_has_system_swi || swivm_has_system_swi; then
+    SWIVM_DIRS_TO_SEARCH="$(swivm_version_dir)"
+    if swivm_has_system_swi ; then
       SWIVM_ADD_SYSTEM=true
     fi
 
-    if ! [ -d "$SWIVM_DIRS_TO_SEARCH" ]; then
+    if ! [ -d "${SWIVM_DIRS_TO_SEARCH}" ] || ! (command ls -1qA "${SWIVM_DIRS_TO_SEARCH}" | swivm_grep -q .); then
       SWIVM_DIRS_TO_SEARCH=''
     fi
 
-    if [ -z "$PATTERN" ]; then
-      PATTERN=''
-    fi
-    if [ -n "$SWIVM_DIRS_TO_SEARCH" ]; then
-      VERSIONS="$(command find "$SWIVM_DIRS_TO_SEARCH" -maxdepth 1 -type d -name "$PATTERN*" \
-        | command sed "
-            s#^$SWIVM_DIR/##;
-            \#^versions\$# d;
-            s#^versions/##" \
-        | $SORT_COMMAND \
-      )"
+    local SEARCH_PATTERN
+    if [ -z "${PATTERN}" ]; then
+      PATTERN='v'
+      SEARCH_PATTERN='.*'
+    else
+      SEARCH_PATTERN="$(swivm_echo "${PATTERN}" | command sed 's#\.#\\\.#g;')"
     fi
 
-    if [ "$ZHS_HAS_SHWORDSPLIT_UNSET" -eq 1 ] && swivm_has "unsetopt"; then
-      unsetopt shwordsplit
+    if [ -n "${SWIVM_DIRS_TO_SEARCH}" ]; then
+      VERSIONS="$(command find "${SWIVM_DIRS_TO_SEARCH}"/* -name . -o -type d -prune -o -path "${PATTERN}*" \
+        | command sed -e "
+            s#^${SWIVM_DIR}/##;
+            \\#^[^v]# d;
+            \\#^versions\$# d;
+            s#^versions/##;
+            \\#${SEARCH_PATTERN}# !d;
+          " \
+          -e 's#^\([^/]\{1,\}\)/\(.*\)$#\2.\1#;' \
+        | command sort -t. -u -k 1.2,1n -k 2,2n -k 3,3n \
+      )"
     fi
   fi
 
-  if [ "$SWIVM_ADD_SYSTEM" = true ]; then
-    if [ -z "$PATTERN" ] || [ "_$PATTERN" = "_v" ]; then
-      VERSIONS="$VERSIONS$(command printf '\n%s' 'system')"
-    elif [ "$PATTERN" = 'system' ]; then
+  if [ "${SWIVM_ADD_SYSTEM-}" = true ]; then
+    if [ -z "${PATTERN}" ] || [ "${PATTERN}" = 'v' ]; then
+      VERSIONS="${VERSIONS}$(command printf '\n%s' 'system')"
+    elif [ "${PATTERN}" = 'system' ]; then
       VERSIONS="$(command printf '%s' 'system')"
     fi
   fi
 
-  if [ -z "$VERSIONS" ]; then
-    echo "N/A"
+  if [ -z "${VERSIONS}" ]; then
+    swivm_echo 'N/A'
     return 3
   fi
 
-  echo "$VERSIONS"
+  swivm_echo "${VERSIONS}"
 }
 
 swivm_ls_remote() {
   local PATTERN
-  PATTERN="$1"
-  if swivm_validate_implicit_alias "$PATTERN" 2> /dev/null ; then
-    PATTERN="$(swivm_ls_remote "$(swivm_print_implicit_alias remote "$PATTERN")" | command tail -n1)"
-  elif [ -z "$PATTERN" ]; then
+  PATTERN="${1-}"
+  if swivm_validate_implicit_alias "${PATTERN}" 2>/dev/null ; then
+    local IMPLICIT
+    IMPLICIT="$(swivm_print_implicit_alias remote "${PATTERN}")"
+    if [ -z "${IMPLICIT-}" ] || [ "${IMPLICIT}" = 'N/A' ]; then
+      swivm_echo "N/A"
+      return 3
+    fi
+    PATTERN="$(swivm_ls_remote "${IMPLICIT}" | command tail -1 | command awk '{ print $1 }')"
+  elif [ -n "${PATTERN}" ]; then
+    PATTERN="$(swivm_ensure_version_prefix "${PATTERN}")"
+  else
     PATTERN=".*"
   fi
-  swivm_ls_remote_index "$SWIVM_MIRROR" "$PATTERN"
+  swivm_ls_remote_index "$SWIVM_MIRROR" "${PATTERN}"
 }
 
 swivm_ls_remote_index() {
@@ -556,7 +754,8 @@ swivm_ls_remote_index() {
     | command grep -E 'a href=\"(swi)?pl\-' \
     | command sed -E 's/^.*a href="(swi)?pl\-(.*)\.tar\.gz".*$/\2/' \
     | command grep -w "^$PATTERN" \
-    | $SORT_COMMAND)"
+    | $SORT_COMMAND \
+    | command sed -E 's/^/v/')"
   if [ "$ZHS_HAS_SHWORDSPLIT_UNSET" -eq 1 ] && swivm_has "unsetopt"; then
     unsetopt shwordsplit
   fi
@@ -576,27 +775,33 @@ swivm_print_versions() {
   if [ -z "${SWIVM_NO_COLORS-}" ] && swivm_has_colors; then
     SWIVM_HAS_COLORS=1
   fi
-  echo "$1" | while read -r VERSION_LINE; do
-    FORMAT='%15s'
+  swivm_echo "${1-}" \
+  | command sed '1!G;h;$!d' \
+  | command awk '{ if ($2 && a[$2]++) { print $1, "(LTS: " $2 ")" } else if ($2) { print $1, "(Latest LTS: " $2 ")" } else { print $0 } }' \
+  | command sed '1!G;h;$!d' \
+  | while read -r VERSION_LINE; do
     VERSION="${VERSION_LINE%% *}"
-    if [ "_$VERSION" = "_$SWIVM_CURRENT" ]; then
+    FORMAT='%15s'
+    if [ "_${VERSION}" = "_${SWIVM_CURRENT}" ]; then
       if [ "${SWIVM_HAS_COLORS-}" = '1' ]; then
         FORMAT='\033[0;32m-> %12s\033[0m'
       else
         FORMAT='-> %12s *'
       fi
-    elif [ "$VERSION" = "system" ]; then
+    elif [ "${VERSION}" = "system" ]; then
       if [ "${SWIVM_HAS_COLORS-}" = '1' ]; then
         FORMAT='\033[0;33m%15s\033[0m'
+      else
+        FORMAT='%15s *'
       fi
-    elif [ -d "$(swivm_version_path "$VERSION" 2> /dev/null)" ]; then
+    elif swivm_is_version_installed "${VERSION}"; then
       if [ "${SWIVM_HAS_COLORS-}" = '1' ]; then
         FORMAT='\033[0;34m%15s\033[0m'
       else
         FORMAT='%15s *'
       fi
     fi
-    command printf -- "${FORMAT}\\n" "$VERSION"
+    command printf -- "${FORMAT}\\n" "${VERSION}"
   done
 }
 
@@ -770,12 +975,14 @@ swivm_install() {
   local tmptarball
   tmptarball="$tmpdir/swipl-$VERSION.tar.gz"
 
-  if [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz" -o - | command grep '200 OK\|HTTP/2 200')" != '' ]; then
-    tarball="$SWIVM_MIRROR/$MODE/src/swipl-$VERSION.tar.gz"
-  elif [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz" -o - | command grep '200 OK\|HTTP/2 200')" != '' ]; then
-    tarball="$SWIVM_MIRROR/$MODE/src/pl-$VERSION.tar.gz"
-  elif [ "$(swivm_download -L -s -I "$GITHUB_MIRROR/swipl-devel/archive/V$VERSION.tar.gz" -o - 2>&1 | command grep '200 OK\|HTTP/2 200')" != '' ]; then
-    tarball="$GITHUB_MIRROR/swipl-devel/archive/V$VERSION.tar.gz"
+  local VERSION_WITHOUT_V
+  VERSION_WITHOUT_V="${VERSION:1}"
+  if [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/swipl-$VERSION_WITHOUT_V.tar.gz" -o - | command grep '200 OK\|HTTP/2 200')" != '' ]; then
+    tarball="$SWIVM_MIRROR/$MODE/src/swipl-$VERSION_WITHOUT_V.tar.gz"
+  elif [ "$(swivm_download -L -s -I "$SWIVM_MIRROR/$MODE/src/pl-$VERSION_WITHOUT_V.tar.gz" -o - | command grep '200 OK\|HTTP/2 200')" != '' ]; then
+    tarball="$SWIVM_MIRROR/$MODE/src/pl-$VERSION_WITHOUT_V.tar.gz"
+  elif [ "$(swivm_download -L -s -I "$GITHUB_MIRROR/swipl-devel/archive/V$VERSION_WITHOUT_V.tar.gz" -o - 2>&1 | command grep '200 OK\|HTTP/2 200')" != '' ]; then
+    tarball="$GITHUB_MIRROR/swipl-devel/archive/V$VERSION_WITHOUT_V.tar.gz"
   fi
 
   local SRC_PATH
@@ -786,9 +993,9 @@ swivm_install() {
     swivm_download -L --progress-bar "$tarball" -o "$tmptarball" && \
     command tar -xzf "$tmptarball" -C "$tmpdir" && \
     command mkdir -p "$SWIVM_DIR/versions" && \
-    ( mv "$tmpdir/swipl-$VERSION" "$VERSION_PATH" >/dev/null 2>&1 || \
-      mv "$tmpdir/pl-$VERSION" "$VERSION_PATH" >/dev/null 2>&1 || \
-      mv "$tmpdir/swipl-devel-$VERSION" "$VERSION_PATH" >/dev/null 2>&1 \
+    ( mv "$tmpdir/swipl-$VERSION_WITHOUT_V" "$VERSION_PATH" >/dev/null 2>&1 || \
+      mv "$tmpdir/pl-$VERSION_WITHOUT_V" "$VERSION_PATH" >/dev/null 2>&1 || \
+      mv "$tmpdir/swipl-devel-$VERSION_WITHOUT_V" "$VERSION_PATH" >/dev/null 2>&1 \
     ) && \
     cd "$VERSION_PATH" && \
     ( ([ "$tarball" = "$GITHUB_MIRROR/swipl-devel/archive/V$VERSION.tar.gz" ] && \
@@ -873,12 +1080,12 @@ swivm_download_git_submodules() {
 swivm_match_version() {
   local PROVIDED_VERSION
   PROVIDED_VERSION="$1"
-  case "_$PROVIDED_VERSION" in
-    "_system")
-      echo "system"
+  case "_${PROVIDED_VERSION}" in
+    '_system')
+      swivm_echo 'system'
     ;;
     *)
-      swivm_version "$PROVIDED_VERSION"
+      swivm_version "${PROVIDED_VERSION}"
     ;;
   esac
 }
@@ -908,6 +1115,19 @@ swivm_die_on_prefix() {
   fi
 }
 
+swivm_is_natural_num() {
+  if [ -z "$1" ]; then
+    return 4
+  fi
+  case "$1" in
+    0) return 1 ;;
+    -*) return 3 ;; # some BSDs return false positives for double-negated args
+    *)
+      [ "$1" -eq "$1" ] 2>/dev/null # returns 2 if it doesn't match
+    ;;
+  esac
+}
+
 swivm_sanitize_path() {
   local SANITIZED_PATH
   SANITIZED_PATH="$1"
@@ -919,19 +1139,34 @@ swivm_sanitize_path() {
 
 swivm() {
   if [ $# -lt 1 ]; then
-    swivm help
+    swivm --help
     return
   fi
 
-  local GREP_OPTIONS
-  GREP_OPTIONS=''
+  local DEFAULT_IFS
+  DEFAULT_IFS=" $(swivm_echo t | command tr t \\t)
+"
+  if [ "${-#*e}" != "$-" ]; then
+    set +e
+    local EXIT_CODE
+    IFS="${DEFAULT_IFS}" swivm "$@"
+    EXIT_CODE=$?
+    set -e
+    return $EXIT_CODE
+  elif [ "${IFS}" != "${DEFAULT_IFS}" ]; then
+    IFS="${DEFAULT_IFS}" swivm "$@"
+    return $?
+  fi
+
+  local COMMAND
+  COMMAND="${1-}"
+  shift
 
   # initialize local variables
   local VERSION
   local ADDITIONAL_PARAMETERS
-  local ALIAS
 
-  case $1 in
+  case $COMMAND in
     "help" )
       echo
       echo "SWI-Prolog Version Manager"
@@ -1000,7 +1235,6 @@ swivm() {
     "install" | "i" )
       local version_not_provided
       version_not_provided=0
-      local provided_version
       local SWIVM_OS
       SWIVM_OS="$(swivm_get_os)"
 
@@ -1009,18 +1243,37 @@ swivm() {
         return 1
       fi
 
-      if [ $# -lt 2 ]; then
+      if [ $# -lt 1 ]; then
         version_not_provided=1
-        swivm_rc_version
-        if [ -z "$SWIVM_RC_VERSION" ]; then
-          >&2 swivm help
-          return 127
-        fi
       fi
 
-      shift
+      while [ $# -ne 0 ]; do
+        case "$1" in
+          ---*)
+            swivm_err 'arguments with `---` are not supported - this is likely a typo'
+            return 55;
+          ;;
+          -s)
+            shift # consume "-s"
+            nobinary=1
+          ;;
+          -j)
+            shift # consume "-j"
+            swivm_get_make_jobs "$1"
+            shift # consume job count
+          ;;
+          --no-progress)
+            noprogress=1
+            shift
+          ;;
+          *)
+            break # stop parsing args
+          ;;
+        esac
+      done
 
-      provided_version="$1"
+      local provided_version
+      provided_version="${1-}"
 
       if [ -z "$provided_version" ]; then
         if [ $version_not_provided -ne 1 ]; then
@@ -1067,6 +1320,7 @@ swivm() {
         return 127
       fi
 
+      local ALIAS
       local PATTERN
       PATTERN="$2"
       VERSION="$(swivm_version "$PATTERN")"
@@ -1123,15 +1377,16 @@ swivm() {
       SWIVM_USE_SILENT=0
       local SWIVM_DELETE_PREFIX
       SWIVM_DELETE_PREFIX=0
+      local SWIVM_LTS
 
-      shift # remove "use"
-      while [ $# -ne 0 ]
-      do
+      while [ $# -ne 0 ]; do
         case "$1" in
           --silent) SWIVM_USE_SILENT=1 ;;
           --delete-prefix) SWIVM_DELETE_PREFIX=1 ;;
+          --) ;;
+          --*) ;;
           *)
-            if [ -n "$1" ]; then
+            if [ -n "${1-}" ]; then
               PROVIDED_VERSION="$1"
             fi
           ;;
@@ -1139,93 +1394,93 @@ swivm() {
         shift
       done
 
-      if [ -z "$PROVIDED_VERSION" ]; then
+      if [ -z "${PROVIDED_VERSION-}" ]; then
         swivm_rc_version
-        if [ -n "$SWIVM_RC_VERSION" ]; then
-          PROVIDED_VERSION="$SWIVM_RC_VERSION"
-          VERSION="$(swivm_version "$PROVIDED_VERSION")"
-        else
-          VERSION="$(swivm_match_version)"
+        if [ -n "${SWIVM_RC_VERSION-}" ]; then
+          PROVIDED_VERSION="${SWIVM_RC_VERSION}"
+          VERSION="$(swivm_version "${PROVIDED_VERSION}")"
+        fi
+        unset SWIVM_RC_VERSION
+        if [ -z "${VERSION}" ]; then
+          swivm_err 'Please see `swivm --help` or https://github.com/fnogatz/swivm#swivmrc for more information.'
+          return 127
         fi
       else
-        VERSION="$(swivm_match_version "$PROVIDED_VERSION")"
+        VERSION="$(swivm_match_version "${PROVIDED_VERSION}")"
       fi
 
-      if [ -z "$VERSION" ]; then
-        >&2 swivm help
+      if [ -z "${VERSION}" ]; then
+        >&2 swivm --help
         return 127
       fi
 
-      if [ "_$VERSION" = '_system' ]; then
+      if [ "_${VERSION}" = '_system' ]; then
         if swivm_has_system_swi && swivm deactivate >/dev/null 2>&1; then
           if [ $SWIVM_USE_SILENT -ne 1 ]; then
-            echo "Now using system version of SWI-Prolog: $(swipl --version 2>/dev/null | sed -E "s/^.* ([0-9](\.[0-9])*) .*$/\1/g")"
+            swivm_echo "Now using system version of SWI-Prolog: $(swipl --version 2>/dev/null)"
           fi
           return
-        else
-          if [ $SWIVM_USE_SILENT -ne 1 ]; then
-            echo "System version of SWI-Prolog not found." >&2
-          fi
-          return 127
+        elif [ $SWIVM_USE_SILENT -ne 1 ]; then
+          swivm_err 'System version of SWI-Prolog not found.'
         fi
-      elif [ "_$VERSION" = "_∞" ]; then
+        return 127
+      elif [ "_${VERSION}" = "_∞" ]; then
         if [ $SWIVM_USE_SILENT -ne 1 ]; then
-          echo "The alias \"$PROVIDED_VERSION\" leads to an infinite loop. Aborting." >&2
+          swivm_err "The alias \"${PROVIDED_VERSION}\" leads to an infinite loop. Aborting."
         fi
         return 8
       fi
-
+      if [ "${VERSION}" = 'N/A' ]; then
+        swivm_err "N/A: version \"${PROVIDED_VERSION} -> ${VERSION}\" is not yet installed."
+        swivm_err ""
+        swivm_err "You need to run \"swivm install ${PROVIDED_VERSION}\" to install it before using it."
+        return 3
       # This swivm_ensure_version_installed call can be a performance bottleneck
       # on shell startup. Perhaps we can optimize it away or make it faster.
-      swivm_ensure_version_installed "$PROVIDED_VERSION"
-      EXIT_CODE=$?
-      if [ "$EXIT_CODE" != "0" ]; then
-        return $EXIT_CODE
+      elif ! swivm_ensure_version_installed "${VERSION}"; then
+        return $?
       fi
 
       local SWIVM_VERSION_DIR
-      SWIVM_VERSION_DIR="$(swivm_version_path "$VERSION")"
+      SWIVM_VERSION_DIR="$(swivm_version_path "${VERSION}")"
 
-      # Strip other version from PATH
-      PATH="$(swivm_strip_path "$PATH" "/bin")"
-      # Prepend current version
-      PATH="$(swivm_prepend_path "$PATH" "$SWIVM_VERSION_DIR/bin")"
+      # Change current version
+      PATH="$(swivm_change_path "${PATH}" "/bin" "${SWIVM_VERSION_DIR}")"
       if swivm_has manpath; then
-        if [ -z "$MANPATH" ]; then
+        if [ -z "${MANPATH-}" ]; then
+          local MANPATH
           MANPATH=$(manpath)
         fi
-        # Strip other version from MANPATH
-        MANPATH="$(swivm_strip_path "$MANPATH" "/share/man")"
-        # Prepend current version
-        MANPATH="$(swivm_prepend_path "$MANPATH" "$SWIVM_VERSION_DIR/share/man")"
+        # Change current version
+        MANPATH="$(swivm_change_path "${MANPATH}" "/share/man" "${SWIVM_VERSION_DIR}")"
         export MANPATH
       fi
       export PATH
       hash -r
-      export SWIVM_BIN="$SWIVM_VERSION_DIR/bin"
-      if [ "$SWIVM_SYMLINK_CURRENT" = true ]; then
-        command rm -f "$SWIVM_DIR/current" && ln -s "$SWIVM_VERSION_DIR" "$SWIVM_DIR/current"
+      export SWIVM_BIN="${SWIVM_VERSION_DIR}/bin"
+      if [ "${SWIVM_SYMLINK_CURRENT-}" = true ]; then
+        command rm -f "${SWIVM_DIR}/current" && ln -s "${SWIVM_VERSION_DIR}" "${SWIVM_DIR}/current"
       fi
       local SWIVM_USE_OUTPUT
-
+      SWIVM_USE_OUTPUT=''
       if [ $SWIVM_USE_SILENT -ne 1 ]; then
-        SWIVM_USE_OUTPUT="Now using SWI-Prolog $VERSION"
+        SWIVM_USE_OUTPUT="Now using SWI-Prolog ${VERSION}"
       fi
-      if [ "_$VERSION" != "_system" ]; then
+      if [ "_${VERSION}" != "_system" ]; then
         local SWIVM_USE_CMD
         SWIVM_USE_CMD="swivm use --delete-prefix"
-        if [ -n "$PROVIDED_VERSION" ]; then
-          SWIVM_USE_CMD="$SWIVM_USE_CMD $VERSION"
+        if [ -n "${PROVIDED_VERSION}" ]; then
+          SWIVM_USE_CMD="${SWIVM_USE_CMD} ${VERSION}"
         fi
         if [ $SWIVM_USE_SILENT -eq 1 ]; then
-          SWIVM_USE_CMD="$SWIVM_USE_CMD --silent"
+          SWIVM_USE_CMD="${SWIVM_USE_CMD} --silent"
         fi
-        if ! swivm_die_on_prefix "$SWIVM_DELETE_PREFIX" "$SWIVM_USE_CMD"; then
+        if ! swivm_die_on_prefix "${SWIVM_DELETE_PREFIX}" "${SWIVM_USE_CMD}"; then
           return 11
         fi
       fi
-      if [ -n "$SWIVM_USE_OUTPUT" ]; then
-        echo "$SWIVM_USE_OUTPUT"
+      if [ -n "${SWIVM_USE_OUTPUT-}" ]; then
+        swivm_echo "${SWIVM_USE_OUTPUT}"
       fi
     ;;
     "run" )
@@ -1344,30 +1599,72 @@ swivm() {
       SWI_VERSION="$VERSION" "$SWIVM_DIR/swivm-exec" "$@"
     ;;
     "ls" | "list" )
+      local PATTERN
+      local SWIVM_NO_COLORS
+      local SWIVM_NO_ALIAS
+      while [ $# -gt 0 ]; do
+        case "${1}" in
+          --) ;;
+          --no-colors) SWIVM_NO_COLORS="${1}" ;;
+          --no-alias) SWIVM_NO_ALIAS="${1}" ;;
+          --*)
+            swivm_err "Unsupported option \"${1}\"."
+            return 55
+          ;;
+          *)
+            PATTERN="${PATTERN:-$1}"
+          ;;
+        esac
+        shift
+      done
+      if [ -n "${PATTERN-}" ] && [ -n "${SWIVM_NO_ALIAS-}" ]; then
+        swivm_err '`--no-alias` is not supported when a pattern is provided.'
+        return 55
+      fi
       local SWIVM_LS_OUTPUT
       local SWIVM_LS_EXIT_CODE
-      SWIVM_LS_OUTPUT=$(swivm_ls "$2")
+      SWIVM_LS_OUTPUT=$(swivm_ls "${PATTERN-}")
       SWIVM_LS_EXIT_CODE=$?
-      swivm_print_versions "$SWIVM_LS_OUTPUT"
-      if [ $# -eq 1 ]; then
-        swivm alias
+      SWIVM_NO_COLORS="${SWIVM_NO_COLORS-}" swivm_print_versions "${SWIVM_LS_OUTPUT}"
+      if [ -z "${SWIVM_NO_ALIAS-}" ] && [ -z "${PATTERN-}" ]; then
+        if [ -n "${SWIVM_NO_COLORS-}" ]; then
+          swivm alias --no-colors
+        else
+          swivm alias
+        fi
       fi
       return $SWIVM_LS_EXIT_CODE
     ;;
-    "ls-remote" | "list-remote" )
+    "ls-remote" | "list-remote")
       local PATTERN
-      PATTERN="$2"
+      local SWIVM_NO_COLORS
+      while [ $# -gt 0 ]; do
+        case "${1-}" in
+          --) ;;
+          --no-colors) SWIVM_NO_COLORS="${1}" ;;
+          --*)
+            swivm_err "Unsupported option \"${1}\"."
+            return 55
+          ;;
+          *)
+            if [ -z "${PATTERN-}" ]; then
+              PATTERN="${1-}"
+            fi
+          ;;
+        esac
+        shift
+      done
 
       local SWIVM_OUTPUT
-      SWIVM_OUTPUT=$(swivm_ls_remote "$PATTERN")
-
-      if [ -n "$SWIVM_OUTPUT" ]; then
-        swivm_print_versions "$SWIVM_OUTPUT"
-        return
-      else
-        swivm_print_versions "N/A"
-        return 3
+      local EXIT_CODE
+      SWIVM_OUTPUT="$(swivm_remote_versions "${PATTERN}" &&:)"
+      EXIT_CODE=$?
+      if [ -n "${SWIVM_OUTPUT}" ]; then
+        SWIVM_NO_COLORS="${SWIVM_NO_COLORS-}" swivm_print_versions "${SWIVM_OUTPUT}"
+        return $EXIT_CODE
       fi
+      SWIVM_NO_COLORS="${SWIVM_NO_COLORS-}" swivm_print_versions "N/A"
+      return 3
     ;;
     "current" )
       swivm_version current
@@ -1422,66 +1719,93 @@ swivm() {
     "alias" )
       local SWIVM_ALIAS_DIR
       SWIVM_ALIAS_DIR="$(swivm_alias_path)"
-      command mkdir -p "$SWIVM_ALIAS_DIR"
-      if [ $# -le 2 ]; then
-        local DEST
-        for ALIAS_PATH in "$SWIVM_ALIAS_DIR"/"$2"*; do
-          ALIAS="$(command basename "$ALIAS_PATH")"
-          DEST="$(swivm_alias "$ALIAS" 2> /dev/null)"
-          if [ -n "$DEST" ]; then
-            VERSION="$(swivm_version "$DEST")"
-            if [ "_$DEST" = "_$VERSION" ]; then
-              echo "$ALIAS -> $DEST"
-            else
-              echo "$ALIAS -> $DEST (-> $VERSION)"
-            fi
-          fi
-        done
+      local SWIVM_CURRENT
+      SWIVM_CURRENT="$(swivm_ls_current)"
 
-        for ALIAS in "stable" "devel"; do
-          if [ ! -f "$SWIVM_ALIAS_DIR/$ALIAS" ]; then
-            if [ $# -lt 2 ] || [ "~$ALIAS" = "~$2" ]; then
-              DEST="$(swivm_print_implicit_alias local "$ALIAS")"
-              if [ "_$DEST" != "_" ]; then
-                VERSION="$(swivm_version "$DEST")"
-                if [ "_$DEST" = "_$VERSION" ]; then
-                  echo "$ALIAS -> $DEST (default)"
-                else
-                  echo "$ALIAS -> $DEST (-> $VERSION) (default)"
-                fi
-              fi
+      local ALIAS
+      local TARGET
+      local SWIVM_NO_COLORS
+      ALIAS='--'
+      TARGET='--'
+      while [ $# -gt 0 ]; do
+        case "${1-}" in
+          --) ;;
+          --no-colors) SWIVM_NO_COLORS="${1}" ;;
+          --*)
+            swivm_err "Unsupported option \"${1}\"."
+            return 55
+          ;;
+          *)
+            if [ "${ALIAS}" = '--' ]; then
+              ALIAS="${1-}"
+            elif [ "${TARGET}" = '--' ]; then
+              TARGET="${1-}"
             fi
-          fi
-        done
-        return
-      fi
-      if [ -z "$3" ]; then
-        command rm -f "$SWIVM_ALIAS_DIR/$2"
-        echo "$2 -> *poof*"
-        return
-      fi
-      VERSION="$(swivm_version "$3")"
-      if [ $? -ne 0 ]; then
-        echo "! WARNING: Version '$3' does not exist." >&2
-      fi
-      echo "$3" | tee "$SWIVM_ALIAS_DIR/$2" >/dev/null
-      if [ ! "_$3" = "_$VERSION" ]; then
-        echo "$2 -> $3 (-> $VERSION)"
+          ;;
+        esac
+        shift
+      done
+
+      if [ -z "${TARGET}" ]; then
+        # for some reason the empty string was explicitly passed as the target
+        # so, unalias it.
+        swivm unalias "${ALIAS}"
+        return $?
+      elif [ "${TARGET}" != '--' ]; then
+        # a target was passed: create an alias
+        if [ "${ALIAS#*\/}" != "${ALIAS}" ]; then
+          swivm_err 'Aliases in subdirectories are not supported.'
+          return 1
+        fi
+        VERSION="$(swivm_version "${TARGET}")" ||:
+        if [ "${VERSION}" = 'N/A' ]; then
+          swivm_err "! WARNING: Version '${TARGET}' does not exist."
+        fi
+        swivm_make_alias "${ALIAS}" "${TARGET}"
+        SWIVM_NO_COLORS="${SWIVM_NO_COLORS-}" SWIVM_CURRENT="${SWIVM_CURRENT-}" DEFAULT=false swivm_print_formatted_alias "${ALIAS}" "${TARGET}" "${VERSION}"
       else
-        echo "$2 -> $3"
+        if [ "${ALIAS-}" = '--' ]; then
+          unset ALIAS
+        fi
+
+        swivm_list_aliases "${ALIAS-}"
       fi
     ;;
     "unalias" )
       local SWIVM_ALIAS_DIR
       SWIVM_ALIAS_DIR="$(swivm_alias_path)"
-      command mkdir -p "$SWIVM_ALIAS_DIR"
-      if [ $# -ne 2 ]; then
-        >&2 swivm help
+      command mkdir -p "${SWIVM_ALIAS_DIR}"
+      if [ $# -ne 1 ]; then
+        >&2 swivm --help
         return 127
       fi
-      [ ! -f "$SWIVM_ALIAS_DIR/$2" ] && echo "Alias $2 doesn't exist!" >&2 && return
-      command rm -f "$SWIVM_ALIAS_DIR/$2"
-      echo "Deleted alias $2"
+      if [ "${1#*\/}" != "${1-}" ]; then
+        swivm_err 'Aliases in subdirectories are not supported.'
+        return 1
+      fi
+
+      local SWIVM_ALIAS_EXISTS
+      SWIVM_ALIAS_EXISTS=0
+      if [ -f "${SWIVM_ALIAS_DIR}/${1-}" ]; then
+        SWIVM_ALIAS_EXISTS=1
+      fi
+
+      if [ $SWIVM_ALIAS_EXISTS -eq 0 ]; then
+        case "$1" in
+          "stable" | "devel" | "system")
+            swivm_err "${1-} is a default (built-in) alias and cannot be deleted."
+            return 1
+          ;;
+        esac
+
+        swivm_err "Alias ${1-} doesn't exist!"
+        return
+      fi
+
+      local SWIVM_ALIAS_ORIGINAL
+      SWIVM_ALIAS_ORIGINAL="$(swivm_alias "${1}")"
+      command rm -f "${SWIVM_ALIAS_DIR}/${1}"
+      swivm_echo "Deleted alias ${1} - restore it with \`swivm alias \"${1}\" \"${SWIVM_ALIAS_ORIGINAL}\"\`"
     ;;
     "clear-cache" )
       command rm -f "$SWIVM_DIR/v*" "$(swivm_version_dir)" 2>/dev/null
@@ -1513,9 +1837,12 @@ swivm() {
         swivm_version_path swivm_alias_path swivm_version_dir \
         swivm_find_swivmrc swivm_find_up swivm_tree_contains_path \
         swivm_version_greater swivm_version_greater_than_or_equal_to \
-        swivm_has_system_swi \
+        swivm_has_system_swi swivm_err swivm_echo \
         swivm_download_git_submodules \
         swivm_download swivm_has swivm_has_colors \
+        swivm_is_natural_num swivm_is_version_installed \
+        swivm_list_aliases swivm_make_alias swivm_print_alias_path \
+        swivm_print_default_alias swivm_print_formatted_alias swivm_resolve_local_alias \
         swivm_supports_source_options > /dev/null 2>&1
       unset RC_VERSION SWIVM_DIR SWIVM_CD_FLAGS > /dev/null 2>&1
     ;;
