@@ -19,6 +19,10 @@ swivm_echo() {
   command printf %s\\n "$*" 2>/dev/null
 }
 
+swivm_cd() {
+  \cd "$@"
+}
+
 swivm_err() {
   >&2 swivm_echo "$@"
 }
@@ -59,7 +63,7 @@ swivm_download() {
   fi
 }
 
-swivm_has_system_swi() {
+swivm_has_system() {
   [ "$(swivm deactivate >/dev/null 2>&1 && command -v swipl)" != '' ]
 }
 
@@ -136,13 +140,16 @@ swivm_rc_version() {
   export SWIVM_RC_VERSION=''
   local SWIVMRC_PATH
   SWIVMRC_PATH="$(swivm_find_swivmrc)"
-  if [ -e "$SWIVMRC_PATH" ]; then
-    read -r SWIVM_RC_VERSION < "$SWIVMRC_PATH"
-    echo "Found '$SWIVMRC_PATH' with version <$SWIVM_RC_VERSION>"
-  else
-    >&2 echo "No .swivmrc file found"
+  if [ ! -e "${SWIVMRC_PATH}" ]; then
+    swivm_err "No .swivmrc file found"
     return 1
   fi
+  SWIVM_RC_VERSION="$(command head -n 1 "${SWIVMRC_PATH}" | command tr -d '\r')" || command printf ''
+  if [ -z "${SWIVM_RC_VERSION}" ]; then
+    swivm_err "Warning: empty .swivmrc file found at \"${SWIVMRC_PATH}\""
+    return 2
+  fi
+  swivm_echo "Found '${SWIVMRC_PATH}' with version <${SWIVM_RC_VERSION}>"
 }
 
 swivm_version_greater() {
@@ -229,15 +236,26 @@ swivm_version() {
 
 swivm_remote_version() {
   local PATTERN
-  PATTERN="$1"
+  PATTERN="${1-}"
   local VERSION
-  if swivm_validate_implicit_alias "$PATTERN" 2> /dev/null ; then
-    VERSION="$(swivm_ls_remote "$PATTERN")"
+  if swivm_validate_implicit_alias "${PATTERN}" 2>/dev/null; then
+    case "${PATTERN}" in
+      *)
+        VERSION="$(swivm_ls_remote "${PATTERN}")" &&:
+      ;;
+    esac
   else
-    VERSION="$(swivm_remote_versions "$PATTERN" | command tail -n1)"
+    VERSION="$(swivm_remote_versions "${PATTERN}" | command tail -1)"
   fi
-  echo "$VERSION"
-  if [ "_$VERSION" = '_N/A' ]; then
+  if [ -n "${SWIVM_VERSION_ONLY-}" ]; then
+    command awk 'BEGIN {
+      n = split(ARGV[1], a);
+      print a[1]
+    }' "${VERSION}"
+  else
+    swivm_echo "${VERSION}"
+  fi
+  if [ "${VERSION}" = 'N/A' ]; then
     return 3
   fi
 }
@@ -261,12 +279,16 @@ swivm_remote_versions() {
 }
 
 swivm_is_valid_version() {
-  if swivm_validate_implicit_alias "$1" 2> /dev/null; then
+  if swivm_validate_implicit_alias "${1-}" 2>/dev/null; then
     return 0
   fi
-
-  local VERSION
-  swivm_version_greater "$VERSION"
+  case "${1-}" in
+    *)
+      local VERSION
+      VERSION="${1-}"
+      swivm_version_greater_than_or_equal_to "${VERSION}" 0
+    ;;
+  esac
 }
 
 swivm_normalize_version() {
@@ -281,11 +303,13 @@ swivm_ensure_version_prefix() {
 
 swivm_format_version() {
   local VERSION
-  VERSION="$1"
-  if [ "_$(swivm_num_version_groups "$VERSION")" != "_3" ]; then
+  VERSION="$(swivm_ensure_version_prefix "${1-}")"
+  local NUM_GROUPS
+  NUM_GROUPS="$(swivm_num_version_groups "${VERSION}")"
+  if [ "${NUM_GROUPS}" -lt 3 ]; then
     swivm_format_version "${VERSION%.}.0"
   else
-    echo "$VERSION"
+    swivm_echo "${VERSION}" | command cut -f1-3 -d.
   fi
 }
 
@@ -329,22 +353,22 @@ swivm_change_path() {
     swivm_echo "${3-}${2-}"
   # if the initial path doesn’t contain an swivm path, prepend the supplementary
   # path
-  elif ! swivm_echo "${1-}" | swivm_grep -q "${NVM_DIR}/[^/]*${2-}" \
-    && ! swivm_echo "${1-}" | swivm_grep -q "${NVM_DIR}/versions/[^/]*/[^/]*${2-}"; then
+  elif ! swivm_echo "${1-}" | swivm_grep -q "${SWIVM_DIR}/[^/]*${2-}" \
+    && ! swivm_echo "${1-}" | swivm_grep -q "${SWIVM_DIR}/versions/[^/]*/[^/]*${2-}"; then
     swivm_echo "${3-}${2-}:${1-}"
   # if the initial path contains BOTH an swivm path (checked for above) and
   # that swivm path is preceded by a system binary path, just prepend the
   # supplementary path instead of replacing it.
   # https://github.com/nvm-sh/nvm/issues/1652#issuecomment-342571223
-  elif swivm_echo "${1-}" | swivm_grep -Eq "(^|:)(/usr(/local)?)?${2-}:.*${NVM_DIR}/[^/]*${2-}" \
-    || swivm_echo "${1-}" | swivm_grep -Eq "(^|:)(/usr(/local)?)?${2-}:.*${NVM_DIR}/versions/[^/]*/[^/]*${2-}"; then
+  elif swivm_echo "${1-}" | swivm_grep -Eq "(^|:)(/usr(/local)?)?${2-}:.*${SWIVM_DIR}/[^/]*${2-}" \
+    || swivm_echo "${1-}" | swivm_grep -Eq "(^|:)(/usr(/local)?)?${2-}:.*${SWIVM_DIR}/versions/[^/]*/[^/]*${2-}"; then
     swivm_echo "${3-}${2-}:${1-}"
   # use sed to replace the existing swivm path with the supplementary path. This
   # preserves the order of the path.
   else
     swivm_echo "${1-}" | command sed \
-      -e "s#${NVM_DIR}/[^/]*${2-}[^:]*#${3-}${2-}#" \
-      -e "s#${NVM_DIR}/versions/[^/]*/[^/]*${2-}[^:]*#${3-}${2-}#"
+      -e "s#${SWIVM_DIR}/[^/]*${2-}[^:]*#${3-}${2-}#" \
+      -e "s#${SWIVM_DIR}/versions/[^/]*/[^/]*${2-}[^:]*#${3-}${2-}#"
   fi
 }
 
@@ -417,7 +441,7 @@ swivm_print_alias_path() {
   local DEST
   DEST="$(swivm_alias "${ALIAS}" 2>/dev/null)" ||:
   if [ -n "${DEST}" ]; then
-    SWIVM_NO_COLORS="${SWIVM_NO_COLORS-}" SWIVM_LTS="${SWIVM_LTS-}" DEFAULT=false swivm_print_formatted_alias "${ALIAS}" "${DEST}"
+    SWIVM_NO_COLORS="${SWIVM_NO_COLORS-}" DEFAULT=false swivm_print_formatted_alias "${ALIAS}" "${DEST}"
   fi
 }
 
@@ -459,7 +483,7 @@ swivm_list_aliases() {
   SWIVM_CURRENT="$(swivm_ls_current)"
   local SWIVM_ALIAS_DIR
   SWIVM_ALIAS_DIR="$(swivm_alias_path)"
-  command mkdir -p "${SWIVM_ALIAS_DIR}/lts"
+  command mkdir -p "${SWIVM_ALIAS_DIR}"
 
   (
     local ALIAS_PATH
@@ -502,10 +526,10 @@ swivm_alias() {
 }
 
 swivm_ls_current() {
-  local SWIVM_LS_CURRENT_NODE_PATH
-  if ! SWIVM_LS_CURRENT_NODE_PATH="$(command which swipl 2>/dev/null)"; then
+  local SWIVM_LS_CURRENT_PATH
+  if ! SWIVM_LS_CURRENT_PATH="$(command which swipl 2>/dev/null)"; then
     swivm_echo 'none'
-  elif swivm_tree_contains_path "${SWIVM_DIR}" "${SWIVM_LS_CURRENT_NODE_PATH}"; then
+  elif swivm_tree_contains_path "${SWIVM_DIR}" "${SWIVM_LS_CURRENT_PATH}"; then
     local VERSION
     VERSION="$(swipl --version | sed -E "s/^.* ([0-9]+(\.[0-9]+)*) .*$/\1/g" 2>/dev/null)"
     swivm_echo "v${VERSION}"
@@ -662,7 +686,7 @@ swivm_ls() {
     SWIVM_ADD_SYSTEM=false
 
     SWIVM_DIRS_TO_SEARCH="$(swivm_version_dir)"
-    if swivm_has_system_swi ; then
+    if swivm_has_system ; then
       SWIVM_ADD_SYSTEM=true
     fi
 
@@ -725,6 +749,7 @@ swivm_ls_remote() {
   else
     PATTERN=".*"
   fi
+
   swivm_ls_remote_index "$SWIVM_MIRROR" "${PATTERN}"
 }
 
@@ -753,7 +778,9 @@ swivm_ls_remote_index() {
   VERSIONS="$(swivm_download -L -s "$MIRROR/devel/src/" "$MIRROR/stable/src/" -o - \
     | command grep -E 'a href=\"(swi)?pl\-' \
     | command sed -E 's/^.*a href="(swi)?pl\-(.*)\.tar\.gz".*$/\2/' \
+    | command sed -E 's/^/v/' \
     | command grep -w "^$PATTERN" \
+    | command sed -E 's/^v//' \
     | $SORT_COMMAND \
     | command sed -E 's/^/v/')"
   if [ "$ZHS_HAS_SHWORDSPLIT_UNSET" -eq 1 ] && swivm_has "unsetopt"; then
@@ -777,7 +804,6 @@ swivm_print_versions() {
   fi
   swivm_echo "${1-}" \
   | command sed '1!G;h;$!d' \
-  | command awk '{ if ($2 && a[$2]++) { print $1, "(LTS: " $2 ")" } else if ($2) { print $1, "(Latest LTS: " $2 ")" } else { print $0 } }' \
   | command sed '1!G;h;$!d' \
   | while read -r VERSION_LINE; do
     VERSION="${VERSION_LINE%% *}"
@@ -945,11 +971,57 @@ swivm_ensure_default_set() {
   return $EXIT_CODE
 }
 
+swivm_get_make_jobs() {
+  if swivm_is_natural_num "${1-}"; then
+    SWIVM_MAKE_JOBS="$1"
+    swivm_echo "number of \`make\` jobs: ${SWIVM_MAKE_JOBS}"
+    return
+  elif [ -n "${1-}" ]; then
+    unset SWIVM_MAKE_JOBS
+    swivm_err "$1 is invalid for number of \`make\` jobs, must be a natural number"
+  fi
+  local SWIVM_OS
+  SWIVM_OS="$(swivm_get_os)"
+  local SWIVM_CPU_CORES
+  case "_${SWIVM_OS}" in
+    "_linux")
+      SWIVM_CPU_CORES="$(swivm_grep -c -E '^processor.+: [0-9]+' /proc/cpuinfo)"
+    ;;
+    "_freebsd" | "_darwin")
+      SWIVM_CPU_CORES="$(sysctl -n hw.ncpu)"
+    ;;
+    "_sunos")
+      SWIVM_CPU_CORES="$(psrinfo | wc -l)"
+    ;;
+    "_aix")
+      SWIVM_CPU_CORES="$(pmcycles -m | wc -l)"
+    ;;
+  esac
+  if ! swivm_is_natural_num "${SWIVM_CPU_CORES}"; then
+    swivm_err 'Can not determine how many core(s) are available, running in single-threaded mode.'
+    swivm_err 'Please report an issue on GitHub to help us make swivm run faster on your computer!'
+    SWIVM_MAKE_JOBS=1
+  else
+    swivm_echo "Detected that you have ${SWIVM_CPU_CORES} CPU core(s)"
+    if [ "${SWIVM_CPU_CORES}" -gt 2 ]; then
+      SWIVM_MAKE_JOBS=$((SWIVM_CPU_CORES - 1))
+      swivm_echo "Running with ${SWIVM_MAKE_JOBS} threads to speed up the build"
+    else
+      SWIVM_MAKE_JOBS=1
+      swivm_echo 'Number of CPU core(s) less than or equal to 2, running in single-threaded mode'
+    fi
+  fi
+}
+
 swivm_install() {
   local VERSION
   VERSION="$1"
+
+  local SWIVM_MAKE_JOBS
+  SWIVM_MAKE_JOBS="${2-}"
+
   local ADDITIONAL_PARAMETERS
-  ADDITIONAL_PARAMETERS="$2"
+  ADDITIONAL_PARAMETERS="$3"
 
   if [ -n "$ADDITIONAL_PARAMETERS" ]; then
     echo "Additional options while compiling: $ADDITIONAL_PARAMETERS"
@@ -1009,8 +1081,8 @@ swivm_install() {
       mkdir build && \
       cd build && \
       cmake .. && \
-      make && \
-      make install \
+      make -j "${SWIVM_MAKE_JOBS}" && \
+      make -j "${SWIVM_MAKE_JOBS}" install \
     ) || ( \
       echo "### [SWIVM] Prepare Installation Template ###" && \
       sed -e "s@PREFIX=\$HOME@PREFIX=$VERSION_PATH@g" build.templ > build.templ.2 && \
@@ -1200,7 +1272,7 @@ swivm() {
       echo 'Example:'
       echo '  swivm install v6.6.2                        Install a specific version number'
       echo '  swivm use 7                                 Use the latest available 7.x.x release'
-      echo '  swivm run 6.6.2 example.pl                  Run example.pl using SWI-Prolog v6.6.2'
+      echo '  swivm run v8.0 example.pl                   Run example.pl using latest SWI-Prolog 8.0.x'
       echo '  swivm exec 6.6.2 swipl example.pl           Run `swipl example.pl` with the PATH pointing to SWI-Prolog v6.6.2'
       echo '  swivm alias default 6.6.2                   Set default SWI-Prolog version on a shell'
       echo
@@ -1232,14 +1304,14 @@ swivm() {
       return 42
     ;;
 
-    "install" | "i" )
+    "install" | "i")
       local version_not_provided
       version_not_provided=0
       local SWIVM_OS
       SWIVM_OS="$(swivm_get_os)"
 
       if ! swivm_has "curl" && ! swivm_has "wget"; then
-        echo 'swivm needs curl or wget to proceed.' >&2;
+        swivm_err 'swivm needs curl or wget to proceed.'
         return 1
       fi
 
@@ -1252,10 +1324,6 @@ swivm() {
           ---*)
             swivm_err 'arguments with `---` are not supported - this is likely a typo'
             return 55;
-          ;;
-          -s)
-            shift # consume "-s"
-            nobinary=1
           ;;
           -j)
             shift # consume "-j"
@@ -1275,44 +1343,54 @@ swivm() {
       local provided_version
       provided_version="${1-}"
 
-      if [ -z "$provided_version" ]; then
-        if [ $version_not_provided -ne 1 ]; then
-          swivm_rc_version
+      if [ -z "${provided_version}" ]; then
+        swivm_rc_version
+        if [ $version_not_provided -eq 1 ] && [ -z "${SWIVM_RC_VERSION}" ]; then
+          unset SWIVM_RC_VERSION
+          >&2 swivm --help
+          return 127
         fi
-        provided_version="$SWIVM_RC_VERSION"
-      else
+        provided_version="${SWIVM_RC_VERSION}"
+        unset SWIVM_RC_VERSION
+      elif [ $# -gt 0 ]; then
         shift
       fi
 
-      VERSION="$(swivm_remote_version "$provided_version")"
+      VERSION="$(SWIVM_VERSION_ONLY=true swivm_remote_version "${provided_version}")"
 
-      if [ "_$VERSION" = "_N/A" ]; then
-        echo "Version '$provided_version' not found - try \`swivm ls-remote\` to browse available versions." >&2
+      if [ "${VERSION}" = 'N/A' ]; then
+        swivm_err "Version '${provided_version}' not found - try \`swivm ls-remote\` to browse available versions."
         return 3
       fi
 
       ADDITIONAL_PARAMETERS=''
-      local PROVIDED_REINSTALL_PACKAGES_FROM
-      local REINSTALL_PACKAGES_FROM
 
-      while [ $# -ne 0 ]
-      do
+      while [ $# -ne 0 ]; do
         case "$1" in
           *)
-            ADDITIONAL_PARAMETERS="$ADDITIONAL_PARAMETERS $1"
+            ADDITIONAL_PARAMETERS="${ADDITIONAL_PARAMETERS} $1"
           ;;
         esac
         shift
       done
 
-      local VERSION_PATH
-      VERSION_PATH="$(swivm_version_path "$VERSION")"
-      if [ -d "$VERSION_PATH" ]; then
-        echo "$VERSION is already installed." >&2
+      if swivm_is_version_installed "${VERSION}"; then
+        swivm_err "${VERSION} is already installed."
+        swivm_ensure_default_set "${provided_version}"
         return $?
       fi
 
-      swivm_install "$VERSION" "$ADDITIONAL_PARAMETERS"
+      local EXIT_CODE
+      EXIT_CODE=-1
+
+      if [ -z "${SWIVM_MAKE_JOBS-}" ]; then
+        swivm_get_make_jobs
+      fi
+
+      SWIVM_NO_PROGRESS="${SWIVM_NO_PROGRESS:-${noprogress}}" swivm_install "$VERSION" "${SWIVM_MAKE_JOBS}" "$ADDITIONAL_PARAMETERS"
+      EXIT_CODE=$?
+
+      return $EXIT_CODE
     ;;
     "uninstall" )
       if [ $# -ne 2 ]; then
@@ -1377,7 +1455,6 @@ swivm() {
       SWIVM_USE_SILENT=0
       local SWIVM_DELETE_PREFIX
       SWIVM_DELETE_PREFIX=0
-      local SWIVM_LTS
 
       while [ $# -ne 0 ]; do
         case "$1" in
@@ -1415,7 +1492,7 @@ swivm() {
       fi
 
       if [ "_${VERSION}" = '_system' ]; then
-        if swivm_has_system_swi && swivm deactivate >/dev/null 2>&1; then
+        if swivm_has_system && swivm deactivate >/dev/null 2>&1; then
           if [ $SWIVM_USE_SILENT -ne 1 ]; then
             swivm_echo "Now using system version of SWI-Prolog: $(swipl --version 2>/dev/null)"
           fi
@@ -1563,40 +1640,53 @@ swivm() {
       return $EXIT_CODE
     ;;
     "exec" )
-      shift
-
       local SWIVM_SILENT
-      SWIVM_SILENT=0
-      if [ "_$1" = "_--silent" ]; then
-        SWIVM_SILENT=1
-        shift
-      fi
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          --silent) SWIVM_SILENT='--silent' ; shift ;;
+          --) break ;;
+          --*)
+            swivm_err "Unsupported option \"$1\"."
+            return 55
+          ;;
+          *)
+            if [ -n "$1" ]; then
+              break
+            else
+              shift
+            fi
+          ;; # stop processing arguments
+        esac
+      done
 
       local provided_version
       provided_version="$1"
-      if [ -n "$provided_version" ]; then
-        VERSION="$(swivm_version "$provided_version")"
-        if [ "_$VERSION" = "_N/A" ] && ! swivm_is_valid_version "$provided_version"; then
-          if [ "$SWIVM_SILENT" -eq 1 ]; then
+      if [ -n "${provided_version}" ]; then
+        VERSION="$(swivm_version "${provided_version}")" ||:
+        if [ "_${VERSION}" = '_N/A' ] && ! swivm_is_valid_version "${provided_version}"; then
+          if [ -n "${SWIVM_SILENT-}" ]; then
             swivm_rc_version >/dev/null 2>&1
           else
             swivm_rc_version
           fi
-          provided_version="$SWIVM_RC_VERSION"
-          VERSION="$(swivm_version "$provided_version")"
+          provided_version="${SWIVM_RC_VERSION}"
+          unset SWIVM_RC_VERSION
+          VERSION="$(swivm_version "${provided_version}")" ||:
         else
           shift
         fi
       fi
 
-      swivm_ensure_version_installed "$provided_version"
+      swivm_ensure_version_installed "${provided_version}"
       EXIT_CODE=$?
-      if [ "$EXIT_CODE" != "0" ]; then
+      if [ "${EXIT_CODE}" != "0" ]; then
         return $EXIT_CODE
       fi
 
-      [ $SWIVM_SILENT -eq 1 ] || echo "Running SWI-Prolog $VERSION$(swivm use --silent "$VERSION")"
-      SWI_VERSION="$VERSION" "$SWIVM_DIR/swivm-exec" "$@"
+      if [ -z "${SWIVM_SILENT-}" ]; then
+        swivm_echo "Running SWI-Prolog ${VERSION}"
+      fi
+      SWI_VERSION="${VERSION}" "${SWIVM_DIR}/swivm-exec" "$@"
     ;;
     "ls" | "list" )
       local PATTERN
@@ -1689,7 +1779,7 @@ swivm() {
       fi
 
       if [ "_$VERSION" = '_system' ]; then
-        if swivm_has_system_swi >/dev/null 2>&1; then
+        if swivm_has_system >/dev/null 2>&1; then
           local SWIVM_BIN
           SWIVM_BIN="$(swivm use system >/dev/null 2>&1 && command which swipl)"
           if [ -n "$SWIVM_BIN" ]; then
@@ -1820,31 +1910,38 @@ swivm() {
     "--version" )
       echo "0.6.0"
     ;;
-    "unload" )
-      unset -f swivm swivm_print_versions \
-        swivm_is_stable_version swivm_is_devel_version \
+    "unload")
+      swivm deactivate >/dev/null 2>&1
+      unset -f swivm \
+        swivm_is_alias \
         swivm_ls_remote swivm_ls_remote_index \
         swivm_ls swivm_remote_version swivm_remote_versions \
-        swivm_install \
+        swivm_print_versions \
         swivm_version swivm_rc_version swivm_match_version \
         swivm_ensure_default_set swivm_get_arch swivm_get_os \
         swivm_print_implicit_alias swivm_validate_implicit_alias \
         swivm_resolve_alias swivm_ls_current swivm_alias \
-        swivm_prepend_path swivm_strip_path \
-        swivm_num_version_groups swivm_format_version \
+        swivm_change_path swivm_strip_path \
+        swivm_num_version_groups swivm_format_version swivm_ensure_version_prefix \
         swivm_normalize_version swivm_is_valid_version \
         swivm_ensure_version_installed \
         swivm_version_path swivm_alias_path swivm_version_dir \
         swivm_find_swivmrc swivm_find_up swivm_tree_contains_path \
         swivm_version_greater swivm_version_greater_than_or_equal_to \
-        swivm_has_system_swi swivm_err swivm_echo \
-        swivm_download_git_submodules \
-        swivm_download swivm_has swivm_has_colors \
+        swivm_has_system \
+        swivm_download swivm_has \
+        swivm_supports_source_options swivm_auto \
+        swivm_echo swivm_err swivm_grep swivm_cd \
+        swivm_die_on_prefix swivm_get_make_jobs \
         swivm_is_natural_num swivm_is_version_installed \
         swivm_list_aliases swivm_make_alias swivm_print_alias_path \
         swivm_print_default_alias swivm_print_formatted_alias swivm_resolve_local_alias \
-        swivm_supports_source_options > /dev/null 2>&1
-      unset RC_VERSION SWIVM_DIR SWIVM_CD_FLAGS > /dev/null 2>&1
+        swivm_sanitize_path swivm_has_colors swivm_process_parameters \
+        swivm_is_zsh \
+        >/dev/null 2>&1
+      unset SWIVM_RC_VERSION SWIVM_MIRROR GITHUB_MIRROR SWIVM_DIR \
+        SWIVM_CD_FLAGS SWIVM_BIN SWIVM_MAKE_JOBS \
+        >/dev/null 2>&1
     ;;
     * )
       >&2 swivm help
@@ -1857,17 +1954,51 @@ swivm_supports_source_options() {
   [ "_$(echo '[ $# -gt 0 ] && echo $1' | . /dev/stdin yes 2> /dev/null)" = "_yes" ]
 }
 
-SWIVM_VERSION="$(swivm_alias default 2>/dev/null || echo)"
-if swivm_supports_source_options && [ "$#" -gt 0 ] && [ "_$1" = "_--install" ]; then
-  if [ -n "$SWIVM_VERSION" ]; then
-    swivm install "$SWIVM_VERSION" >/dev/null
-  elif swivm_rc_version >/dev/null 2>&1; then
-    swivm install >/dev/null
+swivm_auto() {
+  local SWIVM_CURRENT
+  SWIVM_CURRENT="$(swivm_ls_current)"
+  local SWIVM_MODE
+  SWIVM_MODE="${1-}"
+  local VERSION
+  if [ "_${SWIVM_MODE}" = '_install' ]; then
+    VERSION="$(swivm_alias default 2>/dev/null || swivm_echo)"
+    if [ -n "${VERSION}" ]; then
+      swivm install "${VERSION}" >/dev/null
+    elif swivm_rc_version >/dev/null 2>&1; then
+      swivm install >/dev/null
+    fi
+  elif [ "_$SWIVM_MODE" = '_use' ]; then
+    if [ "_${SWIVM_CURRENT}" = '_none' ] || [ "_${SWIVM_CURRENT}" = '_system' ]; then
+      VERSION="$(swivm_resolve_local_alias default 2>/dev/null || swivm_echo)"
+      if [ -n "${VERSION}" ]; then
+        swivm use --silent "${VERSION}" >/dev/null
+      elif swivm_rc_version >/dev/null 2>&1; then
+        swivm use --silent >/dev/null
+      fi
+    else
+      swivm use --silent "${SWIVM_CURRENT}" >/dev/null
+    fi
+  elif [ "_${SWIVM_MODE}" != '_none' ]; then
+    swivm_err 'Invalid auto mode supplied.'
+    return 1
   fi
-elif [ -n "$SWIVM_VERSION" ]; then
-  swivm use --silent "$SWIVM_VERSION" >/dev/null
-elif swivm_rc_version >/dev/null 2>&1; then
-  swivm use --silent >/dev/null
-fi
+}
+
+swivm_process_parameters() {
+  local SWIVM_AUTO_MODE
+  SWIVM_AUTO_MODE='use'
+  if swivm_supports_source_options; then
+    while [ $# -ne 0 ]; do
+      case "$1" in
+        --install) SWIVM_AUTO_MODE='install' ;;
+        --no-use) SWIVM_AUTO_MODE='none' ;;
+      esac
+      shift
+    done
+  fi
+  swivm_auto "${SWIVM_AUTO_MODE}"
+}
+
+swivm_process_parameters "$@"
 
 } # this ensures the entire script is downloaded #

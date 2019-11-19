@@ -1,13 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 DIR="$(command cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-source "$DIR/swivm.sh"
+# shellcheck disable=SC1090
+\. "$DIR/swivm.sh" --no-use
 
 if [ -n "$SWI_VERSION" ]; then
-  swivm use $SWI_VERSION > /dev/null || (echo "SWI_VERSION not set" >&2 && exit 127)
-else
-  swivm use > /dev/null || (echo "No .swivmrc file found" >&2 && exit 127)
+  swivm use "$SWI_VERSION" > /dev/null || exit 127
+elif ! swivm use >/dev/null 2>&1; then
+  echo "No SWI_VERSION provided; no .swivmrc file found" >&2
+  exit 127
 fi
 
-exec $@
+exec "$@"
