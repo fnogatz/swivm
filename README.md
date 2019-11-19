@@ -134,3 +134,7 @@ If you try to install a SWI-Prolog version and the installation fails, be sure t
 ## License
 
 swivm is released under the MIT license, like the original [nvm](https://github.com/creationix/nvm).
+
+## Migration from `v0.x` to `v1.x`
+
+With the release of version 1.x of swivm we changed the file path in the `versions` directory to contain the prefix `v`. For instance, the files for SWI-Prolog version 8.0.3 are now located at `versions/v8.0.3` instead of `versions/8.0.3`.
