@@ -44,13 +44,13 @@ Building SWI-Prolog v7.7.20+ requires cmake version 3.5 or later.
 
 ### Install script
 
-To install or update swivm, you can use the [install script](https://github.com/fnogatz/swivm/blob/v0.6.0/install.sh) using cURL:
+To install or update swivm, you can use the [install script](https://github.com/fnogatz/swivm/blob/v1.0.0/install.sh) using cURL:
 
-    curl -o- https://raw.githubusercontent.com/fnogatz/swivm/v0.6.0/install.sh | bash
+    curl -o- https://raw.githubusercontent.com/fnogatz/swivm/v1.0.0/install.sh | bash
 
 or Wget:
 
-    wget -qO- https://raw.githubusercontent.com/fnogatz/swivm/v0.6.0/install.sh | bash
+    wget -qO- https://raw.githubusercontent.com/fnogatz/swivm/v1.0.0/install.sh | bash
 
 <sub>The script clones the swivm repository to `~/.swivm` and adds the source line to your profile (`~/.bash_profile`, `~/.zshrc` or `~/.profile`).</sub>
 
