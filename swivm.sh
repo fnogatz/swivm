@@ -1779,52 +1779,53 @@ swivm() {
     "current" )
       swivm_version current
     ;;
-    "which" )
+    "which")
       local provided_version
-      provided_version="$2"
-      if [ $# -eq 1 ]; then
+      provided_version="${1-}"
+      if [ $# -eq 0 ]; then
         swivm_rc_version
-        if [ -n "$SWIVM_RC_VERSION" ]; then
-          provided_version="$SWIVM_RC_VERSION"
-          VERSION=$(swivm_version "$SWIVM_RC_VERSION")
+        if [ -n "${SWIVM_RC_VERSION}" ]; then
+          provided_version="${SWIVM_RC_VERSION}"
+          VERSION=$(swivm_version "${SWIVM_RC_VERSION}") ||:
+        else
+          VERSION=$(swivm_ls_current)
         fi
-      elif [ "_$2" != '_system' ]; then
-        VERSION="$(swivm_version "$provided_version")"
+        unset SWIVM_RC_VERSION
+      elif [ "_${1}" != '_system' ]; then
+        VERSION="$(swivm_version "${provided_version}")" ||:
       else
-        VERSION="$2"
+        VERSION="${1-}"
       fi
-      if [ -z "$VERSION" ]; then
-        >&2 swivm help
+      if [ -z "${VERSION}" ]; then
+        >&2 swivm --help
         return 127
       fi
 
-      if [ "_$VERSION" = '_system' ]; then
+      if [ "_${VERSION}" = '_system' ]; then
         if swivm_has_system >/dev/null 2>&1; then
           local SWIVM_BIN
           SWIVM_BIN="$(swivm use system >/dev/null 2>&1 && command which swipl)"
-          if [ -n "$SWIVM_BIN" ]; then
-            echo "$SWIVM_BIN"
+          if [ -n "${SWIVM_BIN}" ]; then
+            swivm_echo "${SWIVM_BIN}"
             return
-          else
-            return 1
           fi
-        else
-          echo "System version of SWI-Prolog not found." >&2
-          return 127
+          return 1
         fi
-      elif [ "_$VERSION" = "_∞" ]; then
-        echo "The alias \"$2\" leads to an infinite loop. Aborting." >&2
+        swivm_err 'System version of SWI-Prolog not found.'
+        return 127
+      elif [ "_${VERSION}" = "_∞" ]; then
+        swivm_err "The alias \"$2\" leads to an infinite loop. Aborting."
         return 8
       fi
 
-      swivm_ensure_version_installed "$provided_version"
+      swivm_ensure_version_installed "${provided_version}"
       EXIT_CODE=$?
-      if [ "$EXIT_CODE" != "0" ]; then
+      if [ "${EXIT_CODE}" != "0" ]; then
         return $EXIT_CODE
       fi
       local SWIVM_VERSION_DIR
-      SWIVM_VERSION_DIR="$(swivm_version_path "$VERSION")"
-      echo "$SWIVM_VERSION_DIR/bin/swipl"
+      SWIVM_VERSION_DIR="$(swivm_version_path "${VERSION}")"
+      swivm_echo "${SWIVM_VERSION_DIR}/bin/swipl"
     ;;
     "alias" )
       local SWIVM_ALIAS_DIR
