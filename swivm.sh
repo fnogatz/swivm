@@ -622,7 +622,7 @@ swivm_version_mode() {
   local NORMALIZED_VERSION
   NORMALIZED_VERSION="$(swivm_normalize_version "$VERSION")"
   local MOD
-  MOD=$(expr "$NORMALIZED_VERSION" \/ 1000000 \% 2)
+  MOD=$(expr "$NORMALIZED_VERSION" \/ 1.1.000 \% 2)
   local MODE
   MODE='stable'
   if [ "$MOD" -eq 1 ]; then
@@ -898,7 +898,7 @@ swivm_print_implicit_alias() {
     MOD="$(swivm_version_mode "$MINOR")"
 # TODO
     NORMALIZED_VERSION="$(swivm_normalize_version "$MINOR")"
-    MOD=$(expr "$NORMALIZED_VERSION" \/ 1000000 \% 2)
+    MOD=$(expr "$NORMALIZED_VERSION" \/ 1.1.000 \% 2)
     if [ "$MOD" -eq 0 ]; then
       STABLE="$MINOR"
     elif [ "$MOD" -eq 1 ]; then
@@ -1967,7 +1967,7 @@ swivm() {
       swivm_remote_version "$2"
     ;;
     "--version" )
-      echo "1.0.0"
+      echo "1.1.0"
     ;;
     "unload")
       swivm deactivate >/dev/null 2>&1
