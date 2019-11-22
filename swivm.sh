@@ -1961,10 +1961,10 @@ swivm() {
       echo "Cache cleared."
     ;;
     "version" )
-      swivm_version "$2"
+      swivm_version "${1}"
     ;;
     "version-remote" )
-      swivm_remote_version "$2"
+      swivm_remote_version "${1}"
     ;;
     "--version" )
       echo "1.1.1"
