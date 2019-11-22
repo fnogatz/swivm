@@ -1269,7 +1269,7 @@ swivm() {
       echo
       echo 'Usage:'
       echo '  swivm help                                  Show this message'
-      echo '  swivm --version                             Print out the latest released version of swivm'
+      echo '  swivm --version                             Print out the installed version of swivm'
       echo '  swivm install <version>                     Download and install a <version>. Uses .swivmrc if available'
       echo '  swivm uninstall <version>                   Uninstall a version'
       echo '  swivm use [--silent] <version>              Modify PATH to use <version>. Uses .swivmrc if available'
