@@ -18,7 +18,7 @@
   "license": "MIT",
   "homepage": "https://github.com/fnogatz/swivm",
   "devDependencies": {
-    "replace": "^1.1.2",
+    "replace": "^1.1.1",
     "semver": "^5.0.1"
   }
 }
