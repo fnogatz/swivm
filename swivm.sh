@@ -1219,6 +1219,22 @@ swivm_is_natural_num() {
   esac
 }
 
+# Check version dir permissions
+swivm_check_file_permissions() {
+  swivm_is_zsh && setopt local_options nonomatch
+  for FILE in "$1"/* "$1"/.[!.]* "$1"/..?* ; do
+    if [ -d "$FILE" ]; then
+      if ! swivm_check_file_permissions "$FILE"; then
+        return 2
+      fi
+    elif [ -e "$FILE" ] && [ ! -w "$FILE" ] && [ ! -O "$FILE" ]; then
+      swivm_err "file is not writable or self-owned: $(swivm_sanitize_path "$FILE")"
+      return 1
+    fi
+  done
+  return 0
+}
+
 swivm_sanitize_path() {
   local SANITIZED_PATH
   SANITIZED_PATH="$1"
@@ -1412,42 +1428,52 @@ swivm() {
 
       return $EXIT_CODE
     ;;
-    "uninstall" )
-      if [ $# -ne 2 ]; then
-        >&2 swivm help
+    "uninstall")
+      if [ $# -ne 1 ]; then
+        >&2 swivm --help
         return 127
       fi
 
-      local ALIAS
       local PATTERN
-      PATTERN="$2"
-      VERSION="$(swivm_version "$PATTERN")"
-      if [ "_$VERSION" = "_$(swivm_ls_current)" ]; then
-        echo "swivm: Cannot uninstall currently-active SWI-Prolog version, $VERSION (inferred from $PATTERN)." >&2
+      PATTERN="${1-}"
+      case "${PATTERN-}" in
+        --) ;;
+        *)
+          VERSION="$(swivm_version "${PATTERN}")"
+        ;;
+      esac
+
+      if [ "_${VERSION}" = "_$(swivm_ls_current)" ]; then
+        swivm_err "swivm: Cannot uninstall currently-active SWI-Prolog version, ${VERSION} (inferred from ${PATTERN})."
         return 1
       fi
 
-      local VERSION_PATH
-      VERSION_PATH="$(swivm_version_path "$VERSION")"
-      if [ ! -d "$VERSION_PATH" ]; then
-        echo "$VERSION version is not installed..." >&2
-        return;
+      if ! swivm_is_version_installed "${VERSION}"; then
+        swivm_err "${VERSION} version is not installed..."
+        return
       fi
 
-      t="$VERSION-$(swivm_get_os)-$(swivm_get_arch)"
+      SWIVM_SUCCESS_MSG="Uninstalled SWI-Prolog ${VERSION}"
 
-      local SWIVM_SUCCESS_MSG
+      local VERSION_PATH
+      VERSION_PATH="$(swivm_version_path "${VERSION}")"
+      if ! swivm_check_file_permissions "${VERSION_PATH}"; then
+        swivm_err 'Cannot uninstall, incorrect permissions on installation folder.'
+        swivm_err 'This is usually caused by running `swivm install -g` as root. Run the following commands as root to fix the permissions and then try again.'
+        swivm_err
+        swivm_err "  chown -R $(whoami) \"$(swivm_sanitize_path "${VERSION_PATH}")\""
+        swivm_err "  chmod -R u+w \"$(swivm_sanitize_path "${VERSION_PATH}")\""
+        return 1
+      fi
 
-      SWIVM_SUCCESS_MSG="Uninstalled SWI-Prolog $VERSION"
       # Delete all files related to target version.
-      command rm -rf "$SWIVM_DIR/src/swipl-$VERSION.tar.*" \
-             "$VERSION_PATH" 2>/dev/null
-      echo "$SWIVM_SUCCESS_MSG"
+      command rm -rf \
+        "${VERSION_PATH}" 2>/dev/null
+      swivm_echo "${SWIVM_SUCCESS_MSG}"
 
       # rm any aliases that point to uninstalled version.
-      for ALIAS in $(command grep -l "$VERSION" "$(swivm_alias_path)/*" 2>/dev/null)
-      do
-        swivm unalias "$(command basename "$ALIAS")"
+      for ALIAS in $(swivm_grep -l "${VERSION}" "$(swivm_alias_path)/*" 2>/dev/null); do
+        swivm unalias "$(command basename "${ALIAS}")"
       done
     ;;
     "deactivate" )
@@ -1975,6 +2001,7 @@ swivm() {
         swivm_is_alias \
         swivm_ls_remote swivm_ls_remote_index \
         swivm_ls swivm_remote_version swivm_remote_versions \
+        nvm_check_file_permissions \
         swivm_print_versions \
         swivm_version swivm_rc_version swivm_match_version \
         swivm_ensure_default_set swivm_get_arch swivm_get_os \
