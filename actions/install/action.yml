@@ -16,3 +16,4 @@ runs:
         git clone https://github.com/fnogatz/swivm.git ~/.swivm
         (cd ~/.swivm && git checkout `git describe --abbrev=0 --tags`)
         . ~/.swivm/swivm.sh
+        echo "Done: install and load swivm"
