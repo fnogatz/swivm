@@ -1063,6 +1063,9 @@ swivm_install() {
     tarball="$GITHUB_MIRROR/swipl-devel/archive/V$VERSION_WITHOUT_V.tar.gz"
   fi
 
+  local SWIVM_ALIAS_DIR
+  SWIVM_ALIAS_DIR="$(swivm_alias_path)"
+
   local SRC_PATH
   if ! (
     [ -n "$tarball" ] && \
