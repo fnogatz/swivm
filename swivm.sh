@@ -2001,7 +2001,7 @@ swivm() {
       swivm_remote_version "${1}"
     ;;
     "--version" )
-      echo "1.2.4"
+      echo "1.2.5"
     ;;
     "unload")
       swivm deactivate >/dev/null 2>&1
