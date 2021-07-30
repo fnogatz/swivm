@@ -1425,8 +1425,12 @@ swivm() {
 
       SWIVM_NO_PROGRESS="${SWIVM_NO_PROGRESS:-${noprogress}}" swivm_install "$VERSION" "${SWIVM_MAKE_JOBS}" "$ADDITIONAL_PARAMETERS"
       EXIT_CODE=$?
+      if [ "${EXIT_CODE}" != "0" ]; then
+        return $EXIT_CODE
+      fi
 
-      return $EXIT_CODE
+      swivm_ensure_default_set "${provided_version}"
+      return
     ;;
     "uninstall")
       if [ $# -ne 1 ]; then
