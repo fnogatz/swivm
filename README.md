@@ -161,8 +161,8 @@ swivm alias default 8.2
 
 swivm provides two workflows for usage with [GitHub Actions](https://docs.github.com/en/actions/learn-github-actions):
 
-- `fnogatz/swivm/actions/install` just installs the latest version of swivm into `~/.swivm/`, so it can be used after `. ~/.swivm/swivm.sh`.
-- `fnogatz/swivm/actions/load` installs swivm as well as SWI-Prolog. Its version can be specified by the `swi-prolog-version` input value (default: `devel`). swivm and SWI-Prolog are available after `. ~/.swivm/swivm.sh`.
+- `fnogatz/swivm/actions/install@main` just installs the latest version of swivm into `~/.swivm/`, so it can be used after `. ~/.swivm/swivm.sh`.
+- `fnogatz/swivm/actions/load@main` installs swivm as well as SWI-Prolog. Its version can be specified by the `swi-prolog-version` input value (default: `devel`). swivm and SWI-Prolog are available after `. ~/.swivm/swivm.sh`.
 
 Here is a non-exhaustive list of projects that use the GitHub Actions provided by swivm:
 
