@@ -718,7 +718,7 @@ swivm_ls() {
             \\#${SEARCH_PATTERN}# !d;
           " \
           -e 's#^\([^/]\{1,\}\)/\(.*\)$#\2.\1#;' \
-        | command sort -t. -u -k 1.2.2n -k 2,2n -k 3,3n \
+        | command sort -t. -u -k 1.2.3n -k 2,2n -k 3,3n \
       )"
     fi
   fi
@@ -2001,7 +2001,7 @@ swivm() {
       swivm_remote_version "${1}"
     ;;
     "--version" )
-      echo "1.2.2"
+      echo "1.2.3"
     ;;
     "unload")
       swivm deactivate >/dev/null 2>&1
