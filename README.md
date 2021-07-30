@@ -133,6 +133,11 @@ swivm provides two workflows for usage with [GitHub Actions](https://docs.github
 - `fnogatz/swivm/actions/install` just installs the latest version of swivm into `~/.swivm`, so it can be used after `source ~/.swivm/swivm.sh`.
 - `fnogatz/swivm/actions/load` installs swivm as well as SWI-Prolog. Its version can be specified by the `swi-prolog-version` input value (default: `devel`). swivm and SWI-Prolog are available after `source ~/.swivm/swivm.sh`.
 
+Here is a non-exhaustive list of projects that use the GitHub Actions provided by swivm:
+- [tap](https://github.com/fnogatz/tap)
+
+Please open an issue if you want to have your project listed here.
+
 ## Problems
 
 If you try to install a SWI-Prolog version and the installation fails, be sure to delete the SWI-Prolog downloads from src (\~/.swivm/src/) and versions (\~/.swivm/versions/) or you might get an error when trying to reinstall them again.
