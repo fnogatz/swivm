@@ -127,6 +127,12 @@ To set a default SWI-Prolog version to be used in any new shell, use the alias '
 
     swivm alias default 7.2
 
+## Usage with GitHub Actions
+
+swivm provides two workflows for usage with [GitHub Actions](https://docs.github.com/en/actions/learn-github-actions):
+- `fnogatz/swivm/actions/install` just installs the latest version of swivm into `~/.swivm`, so it can be used after `source ~/.swivm/swivm.sh`.
+- `fnogatz/swivm/actions/load` installs swivm as well as SWI-Prolog. Its version can be specified by the `swi-prolog-version` input value (default: `devel`). swivm and SWI-Prolog are available after `source ~/.swivm/swivm.sh`.
+
 ## Problems
 
 If you try to install a SWI-Prolog version and the installation fails, be sure to delete the SWI-Prolog downloads from src (\~/.swivm/src/) and versions (\~/.swivm/versions/) or you might get an error when trying to reinstall them again.
