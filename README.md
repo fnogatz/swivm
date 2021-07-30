@@ -56,7 +56,7 @@ or Wget:
 wget -qO- https://raw.githubusercontent.com/fnogatz/swivm/v1.2.5/install.sh | bash
 ```
 
-<sub>The script clones the swivm repository to `~/.swivm` and adds the source line to your profile (`~/.bash_profile`, `~/.zshrc` or `~/.profile`).</sub>
+<sub>The script clones the swivm repository to `~/.swivm/` and adds the source line to your profile (`~/.bash_profile`, `~/.zshrc` or `~/.profile`).</sub>
 
 You can customize the install source, directory and profile using the `SWIVM_SOURCE`, `SWIVM_DIR`, and `PROFILE` variables.
 Eg: `curl ... | SWIVM_DIR=/usr/local/swivm bash` for a global install.
@@ -65,7 +65,7 @@ Eg: `curl ... | SWIVM_DIR=/usr/local/swivm bash` for a global install.
 
 ### Manual install
 
-For manual install create a folder somewhere in your filesystem with the `swivm.sh` file inside it. I put mine in `~/.swivm`.
+For manual install create a folder somewhere in your filesystem with the `swivm.sh` file inside it. I put mine in `~/.swivm/`.
 
 Or if you have `git` installed, then just clone it, and check out the latest version:
 
@@ -161,7 +161,7 @@ swivm alias default 8.2
 
 swivm provides two workflows for usage with [GitHub Actions](https://docs.github.com/en/actions/learn-github-actions):
 
-- `fnogatz/swivm/actions/install` just installs the latest version of swivm into `~/.swivm`, so it can be used after `. ~/.swivm/swivm.sh`.
+- `fnogatz/swivm/actions/install` just installs the latest version of swivm into `~/.swivm/`, so it can be used after `. ~/.swivm/swivm.sh`.
 - `fnogatz/swivm/actions/load` installs swivm as well as SWI-Prolog. Its version can be specified by the `swi-prolog-version` input value (default: `devel`). swivm and SWI-Prolog are available after `. ~/.swivm/swivm.sh`.
 
 Here is a non-exhaustive list of projects that use the GitHub Actions provided by swivm:
@@ -172,4 +172,4 @@ Please open an issue if you want to have your project listed here.
 
 ## Known Problems
 
-If you try to install a SWI-Prolog version and the installation fails, be sure to delete the SWI-Prolog downloads from src (\~/.swivm/src/) and versions (\~/.swivm/versions/) or you might get an error when trying to reinstall them again.
+If you try to install a SWI-Prolog version and the installation fails, be sure to delete the SWI-Prolog downloads from src (`~/.swivm/src/`) and versions (`~/.swivm/versions/`) or you might get an error when trying to reinstall them again.
