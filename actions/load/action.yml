@@ -1,0 +1,23 @@
+name: Setup swivm and SWI-Prolog
+description: Installs the SWI-Prolog version manager (swivm) and a SWI-Prolog instance
+author: fnogatz
+
+inputs:
+  swi-prolog-version:
+    description: SWI-Prolog version to install
+    required: false
+    default: devel
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Install swivm
+      uses: fnogatz/swivm/actions/install@add-github-action
+
+    - name: Install SWI-Prolog
+      shell: bash
+      run: |
+        source ~/.swivm/swivm.sh
+        swivm install ${{ inputs.swi-prolog-version }}
+        swivm use ${{ inputs.swi-prolog-version }}
