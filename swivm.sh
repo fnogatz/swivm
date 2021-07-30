@@ -1071,6 +1071,7 @@ swivm_install() {
     swivm_download -L --progress-bar "$tarball" -o "$tmptarball" && \
     command tar -xzf "$tmptarball" -C "$tmpdir" && \
     command mkdir -p "$SWIVM_DIR/versions" && \
+    command mkdir -p "${SWIVM_ALIAS_DIR}" && \
     ( mv "$tmpdir/swipl-$VERSION_WITHOUT_V" "$VERSION_PATH" >/dev/null 2>&1 || \
       mv "$tmpdir/pl-$VERSION_WITHOUT_V" "$VERSION_PATH" >/dev/null 2>&1 || \
       mv "$tmpdir/swipl-devel-$VERSION_WITHOUT_V" "$VERSION_PATH" >/dev/null 2>&1 \
@@ -1430,7 +1431,7 @@ swivm() {
       fi
 
       swivm_ensure_default_set "${provided_version}"
-      return
+      return $?
     ;;
     "uninstall")
       if [ $# -ne 1 ]; then
