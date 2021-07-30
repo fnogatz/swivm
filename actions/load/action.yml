@@ -1,0 +1,33 @@
+name: Setup swivm and SWI-Prolog
+description: Installs the SWI-Prolog version manager (swivm) and a SWI-Prolog instance
+author: fnogatz
+
+inputs:
+  swi-prolog-version:
+    description: SWI-Prolog version to install
+    required: false
+    default: devel
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Install prerequisites
+      shell: bash
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install -y build-essential autoconf curl chrpath pkg-config ncurses-dev libreadline-dev libedit-dev libgmp-dev libssl-dev unixodbc-dev zlib1g-dev libarchive-dev libossp-uuid-dev libxext-dev libice-dev libjpeg-dev libxinerama-dev libxft-dev libxpm-dev libxt-dev libdb-dev libpcre3-dev libyaml-dev make ninja-build cmake junit openjdk-8-jdk
+
+    - name: Install swivm
+      shell: bash
+      run: |
+        rm -rf ~/.swivm
+        git clone https://github.com/fnogatz/swivm.git ~/.swivm
+        (cd ~/.swivm && git checkout `git describe --abbrev=0 --tags`)
+
+    - name: Install SWI-Prolog
+      shell: bash
+      run: |
+        source ~/.swivm/swivm.sh
+        swivm install ${{ inputs.swi-prolog-version }}
+        swivm use ${{ inputs.swi-prolog-version }}
