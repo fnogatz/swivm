@@ -1533,7 +1533,7 @@ swivm() {
         fi
         unset SWIVM_RC_VERSION
         if [ -z "${VERSION}" ]; then
-          swivm_err 'Please see `swivm --help` or https://github.com/fnogatz/swivm#swivmrc for more information.'
+          swivm_err 'Please see `swivm --help` or https://github.com/fnogatz/swivm#usage for more information.'
           return 127
         fi
       else
