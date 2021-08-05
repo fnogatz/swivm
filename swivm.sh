@@ -1295,7 +1295,7 @@ swivm() {
       echo '  swivm use [--silent] <version>              Modify PATH to use <version>. Uses .swivmrc if available'
       echo '  swivm exec [--silent] <version> [<command>] Run <command> on <version>. Uses .swivmrc if available'
       echo '  swivm run [--silent] <version> [<args>]     Run `swipl` on <version> with <args> as arguments. Uses .swivmrc if available'
-      echo '  swivm current                               Display currently activated version'
+      echo '  swivm current [--pack]                      Display currently activated version'
       echo '  swivm ls                                    List installed versions'
       echo '  swivm ls <version>                          List versions matching a given description'
       echo '  swivm ls-remote                             List remote versions available for install'
@@ -1811,6 +1811,28 @@ swivm() {
       return 3
     ;;
     "current" )
+      local SWIVM_PACK
+      while [ $# -gt 0 ]; do
+        case "${1-}" in
+          --) ;;
+          --pack) SWIVM_PACK="${1}" ;;
+          --*)
+            swivm_err "Unsupported option \"${1}\"."
+            return 55
+          ;;
+        esac
+        shift
+      done
+
+      if [ -n "${SWIVM_PACK}" ]; then
+        OUTPUT="$(swipl -g "absolute_file_name(pack('.'),D),writeln(D)" -t 'halt(1)')"
+        EXIT_CODE="$?"
+        if [ -n "$OUTPUT" ]; then
+          echo "$OUTPUT"
+        fi
+        return $EXIT_CODE
+      fi
+
       swivm_version current
     ;;
     "which")
