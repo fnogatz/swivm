@@ -31,3 +31,4 @@ runs:
         source ~/.swivm/swivm.sh
         swivm install ${{ inputs.swi-prolog-version }}
         swivm use ${{ inputs.swi-prolog-version }}
+        swipl --version
