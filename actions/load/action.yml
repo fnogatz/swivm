@@ -16,7 +16,13 @@ runs:
       shell: bash
       run: |
         sudo apt-get -qq update
-        sudo apt-get install -y build-essential autoconf curl chrpath pkg-config ncurses-dev libreadline-dev libedit-dev libgmp-dev libssl-dev unixodbc-dev zlib1g-dev libarchive-dev libossp-uuid-dev libxext-dev libice-dev libjpeg-dev libxinerama-dev libxft-dev libxpm-dev libxt-dev libdb-dev libpcre3-dev libyaml-dev make ninja-build cmake junit openjdk-8-jdk
+        sudo apt-get install -y build-essential autoconf curl chrpath pkg-config ncurses-dev libreadline-dev libedit-dev libgmp-dev libssl-dev unixodbc-dev zlib1g-dev libarchive-dev libossp-uuid-dev libxext-dev libice-dev libjpeg-dev libxinerama-dev libxft-dev libxpm-dev libxt-dev libdb-dev libpcre3-dev libyaml-dev make ninja-build cmake junit
+
+    - name: Install Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '8'
 
     - name: Debug
       shell: bash
