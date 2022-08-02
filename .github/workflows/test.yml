@@ -1,0 +1,26 @@
+name: Automatic tests
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  make_test:
+    name: Install SWI-Prolog version
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        swipl: ["stable", "devel", "8", "7"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install swivm and SWI-Prolog
+        uses: ./actions/load
+        with:
+          swi-prolog-version: ${{ matrix.swipl }}
+
+      - name: Print SWI-Prolog version
+        run: |
+          source ~/.swivm/swivm.sh
+          swipl --version
