@@ -9,7 +9,7 @@ jobs:
 
     strategy:
       matrix:
-        swipl: ["stable", "devel", "8", "7"]
+        swipl: ["stable", "devel", "8", "7", "6"]
 
     steps:
       - name: Checkout
