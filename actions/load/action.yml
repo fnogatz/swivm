@@ -16,7 +16,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get -qq update
-        sudo apt-get install -y build-essential autoconf curl chrpath pkg-config ncurses-dev libreadline-dev libedit-dev libgmp-dev libssl-dev unixodbc-dev zlib1g-dev libarchive-dev libossp-uuid-dev libxext-dev libice-dev libjpeg-dev libxinerama-dev libxft-dev libxpm-dev libxt-dev libdb-dev libpcre3-dev libyaml-dev make ninja-build cmake junit openjdk-18-jdk
+        sudo apt-get install -y build-essential autoconf curl chrpath pkg-config ncurses-dev libreadline-dev libedit-dev libgmp-dev libssl-dev unixodbc-dev zlib1g-dev libarchive-dev libossp-uuid-dev libxext-dev libice-dev libjpeg-dev libxinerama-dev libxft-dev libxpm-dev libxt-dev libdb-dev libpcre3-dev libyaml-dev make ninja-build cmake junit openjdk-17-jdk
 
     - name: Install swivm
       shell: bash
