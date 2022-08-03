@@ -24,11 +24,6 @@ runs:
         distribution: 'zulu'
         java-version: '8'
 
-    - name: Debug
-      shell: bash
-      run: |
-        javac -version
-
     - name: Install swivm
       shell: bash
       run: |
