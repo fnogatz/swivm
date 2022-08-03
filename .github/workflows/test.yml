@@ -3,19 +3,35 @@ name: Automatic tests
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  make_test:
-    name: Install SWI-Prolog version
+  test_install_swivm:
+    name: Install swivm
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        swipl: ["stable", "devel", "8", "7"]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Install swivm and SWI-Prolog
+      - name: Install swivm
+        uses: ./actions/install
+
+      - name: Print swivm version
+        run: |
+          source ~/.swivm/swivm.sh
+          swivm --version
+
+  test_load_swipl:
+    name: Install swivm and load SWI-Prolog version
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        swipl: ["stable", "devel", "8", "7", "6"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install swivm and load SWI-Prolog
         uses: ./actions/load
         with:
           swi-prolog-version: ${{ matrix.swipl }}
