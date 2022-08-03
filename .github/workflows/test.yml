@@ -11,7 +11,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Install swivm and SWI-Prolog
+      - name: Install swivm
         uses: ./actions/install
 
       - name: Print swivm version
@@ -31,7 +31,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Install swivm and SWI-Prolog
+      - name: Install swivm and load SWI-Prolog
         uses: ./actions/load
         with:
           swi-prolog-version: ${{ matrix.swipl }}
