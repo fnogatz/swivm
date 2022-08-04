@@ -9,10 +9,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          ref: test-v5-via-github-actions
 
       - name: Install swivm
-        uses: ./actions/install@test-v5-via-github-actions
+        uses: ./actions/install
 
       - name: Print swivm version
         run: |
@@ -29,10 +31,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          ref: test-v5-via-github-actions
 
       - name: Install swivm and load SWI-Prolog
-        uses: ./actions/load@test-v5-via-github-actions
+        uses: ./actions/load
         with:
           swi-prolog-version: ${{ matrix.swipl }}
 
