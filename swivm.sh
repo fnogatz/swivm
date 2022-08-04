@@ -1099,6 +1099,7 @@ swivm_install() {
       sed -e "s@MAKE=make@MAKE=$make@g" build.templ.2 > build && \
       rm build.templ.2 && \
       chmod +x build && \
+      ((sed -e "s@\$(JAVADOC) -public -d \$(JPLDOC) \$(JPLJAVA)@\$(JAVADOC) -Xdoclint:none -public -d \$(JPLDOC) \$(JPLJAVA)@g" packages/jpl/src/java/Makefile.in > packages/jpl/src/java/Makefile.in.2 && rm packages/jpl/src/java/Makefile.in && mv packages/jpl/src/java/Makefile.in.2 packages/jpl/src/java/Makefile.in) || echo "JPL Makefile not changed") && \
       echo "### [SWIVM] Prepare SWI-Prolog ###" && \
       ./prepare --yes --all && \
       echo "### [SWIVM] Build SWI-Prolog ###" && \
