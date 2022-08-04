@@ -1100,6 +1100,7 @@ swivm_install() {
       rm build.templ.2 && \
       chmod +x build && \
       ((sed -e "s@\$(JAVADOC) -public -d \$(JPLDOC) \$(JPLJAVA)@\$(JAVADOC) -Xdoclint:none -public -d \$(JPLDOC) \$(JPLJAVA)@g" packages/jpl/src/java/Makefile.in > packages/jpl/src/java/Makefile.in.2 && rm packages/jpl/src/java/Makefile.in && mv packages/jpl/src/java/Makefile.in.2 packages/jpl/src/java/Makefile.in) || echo "JPL Makefile not changed") && \
+      echo "### falco" && \
       command cat packages/jpl/src/java/Makefile.in && \
       echo "### [SWIVM] Prepare SWI-Prolog ###" && \
       ./prepare --yes --all && \
