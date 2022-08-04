@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Install swivm
-        uses: ./actions/install
+        uses: ./actions/install@test-v5-via-github-actions
 
       - name: Print swivm version
         run: |
@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Install swivm and load SWI-Prolog
-        uses: ./actions/load
+        uses: ./actions/load@test-v5-via-github-actions
         with:
           swi-prolog-version: ${{ matrix.swipl }}
 
