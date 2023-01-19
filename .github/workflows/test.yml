@@ -25,7 +25,7 @@ jobs:
 
     strategy:
       matrix:
-        swipl: ["stable", "devel", "8", "7", "6"]
+        swipl: [devel, stable, 6, 7, 8, 9]
 
     steps:
       - name: Checkout
