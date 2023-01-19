@@ -1088,6 +1088,10 @@ swivm_install() {
     cd "$VERSION_PATH" && \
     ( ([[ -f CMakeLists.txt ]] && \
       export SWIPL_INSTALL_PREFIX="$VERSION_PATH" && \
+      ( ([[ -f packages/ssl/crypto4pl.c ]] && \
+        command mv packages/ssl/crypto4pl.c packages/ssl/crypto4pl.c.original && \
+        command sed "s@    else if ( a == ATOM_sslv23  \&\& mode == RSA_MODE )    \*padding = RSA_SSLV23_PADDING;@#ifdef RSA_SSLV23_PADDING\n    else if ( a == ATOM_sslv23  \&\& mode == RSA_MODE )    \*padding = RSA_SSLV23_PADDING;\n#endif@g" packages/ssl/crypto4pl.c.original > packages/ssl/crypto4pl.c \
+      ) || true) && \
       mkdir build && \
       cd build && \
       cmake .. && \
