@@ -1112,7 +1112,17 @@ swivm_install() {
       ./configure && \
       $MAKE && \
       echo "### [SWIVM] Install Packages ###" && \
-      make install )) \
+      make install )) && \
+      # fix server URL in prolog_pack.pl \
+      cd "$VERSION_PATH" && \
+      ( ([[ -f lib/swipl/library/prolog_pack.pl ]] && \
+        command mv lib/swipl/library/prolog_pack.pl lib/swipl/library/prolog_pack.pl.original && \
+        command sed "s@:- setting(server, atom, 'http://www.swi-prolog.org/pack/',@:- setting(server, atom, 'https://www.swi-prolog.org/pack/',@g" lib/swipl/library/prolog_pack.pl.original > lib/swipl/library/prolog_pack.pl \
+      ) || true) &&
+      ( ([[ -f library/prolog_pack.pl ]] && \
+        command mv library/prolog_pack.pl library/prolog_pack.pl.original && \
+        command sed "s@:- setting(server, atom, 'http://www.swi-prolog.org/pack/',@:- setting(server, atom, 'https://www.swi-prolog.org/pack/',@g" library/prolog_pack.pl.original > library/prolog_pack.pl \
+      ) || true) \
     )
   then
     echo "swivm: install $VERSION failed!" >&2
